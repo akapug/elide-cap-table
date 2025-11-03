@@ -1,0 +1,20 @@
+amends "elide:project.pkl"
+
+name = "elide-cap-table"
+version = "1.0.0"
+description = "Interactive cap table visualization using filesystem/treemap analogy"
+
+dependencies {
+  npm {
+    packages {
+      "d3@7"
+    }
+  }
+}
+
+scripts {
+  ["dev"] = "elide serve server.ts"
+  ["node-dev"] = "node server-node.js"
+  ["build"] = "elide build"
+}
+

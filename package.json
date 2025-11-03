@@ -1,0 +1,15 @@
+{
+  "name": "elide-cap-table",
+  "version": "1.0.0",
+  "description": "Interactive cap table visualization",
+  "type": "module",
+  "main": "server-node.js",
+  "scripts": {
+    "dev": "node server-node.js",
+    "start": "node server-node.js"
+  },
+  "dependencies": {
+    "d3": "^7.9.0"
+  }
+}
+
