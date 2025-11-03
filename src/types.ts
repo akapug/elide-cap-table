@@ -26,7 +26,7 @@ export interface Allocation {
   id: string;
   holderName: string;
   shares: number;
-  type: "common" | "preferred" | "option";
+  type: "common" | "preferred" | "option" | "rsu";
   vestingSchedule?: string;
   notes?: string;
 }

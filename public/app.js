@@ -4,6 +4,9 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 let capTable = null;
 let currentViewMode = "shares";
 let currentZoomNode = null;
+let editingRound = null;
+let editingAllocation = null;
+let editingRoundId = null;
 
 // Initialize
 async function init() {
@@ -32,9 +35,23 @@ async function init() {
   document.getElementById("toggle-sidebar").addEventListener("click", toggleSidebar);
   document.getElementById("reset-zoom").addEventListener("click", resetZoom);
   document.getElementById("save-company").addEventListener("click", saveCompanyInfo);
+  document.getElementById("add-round").addEventListener("click", () => openRoundModal());
+
+  // Round modal
+  document.getElementById("round-modal-close").addEventListener("click", closeRoundModal);
+  document.getElementById("round-cancel").addEventListener("click", closeRoundModal);
+  document.getElementById("round-save").addEventListener("click", saveRound);
+
+  // Allocation modal
+  document.getElementById("allocation-modal-close").addEventListener("click", closeAllocationModal);
+  document.getElementById("allocation-cancel").addEventListener("click", closeAllocationModal);
+  document.getElementById("allocation-save").addEventListener("click", saveAllocation);
 
   // Window resize
   window.addEventListener("resize", () => renderTreemap());
+
+  // Render rounds list
+  renderRoundsList();
 }
 
 // View mode
@@ -395,6 +412,226 @@ function formatCurrency(num) {
 function calculatePercentage(part, total) {
   return ((part / total) * 100).toFixed(2) + "%";
 }
+
+// Rounds Management
+function renderRoundsList() {
+  const container = document.getElementById("rounds-list");
+  container.innerHTML = "";
+
+  capTable.rounds.forEach((round) => {
+    const totalShares = round.allocations.reduce((sum, a) => sum + a.shares, 0);
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.innerHTML = `
+      <div class="list-item-info">
+        <div class="list-item-title" style="color: ${round.color}">${round.name}</div>
+        <div class="list-item-details">
+          ${formatNumber(totalShares)} shares • ${round.allocations.length} allocations
+          ${round.pricePerShare ? ` • $${round.pricePerShare}/share` : ""}
+        </div>
+      </div>
+      <div class="list-item-actions">
+        <button class="secondary" onclick="editRound('${round.id}')">Edit</button>
+        <button class="secondary" onclick="manageAllocations('${round.id}')">Allocations</button>
+        <button class="danger" onclick="deleteRound('${round.id}')">Delete</button>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function openRoundModal(roundId = null) {
+  editingRound = roundId;
+  const modal = document.getElementById("round-modal");
+  const title = document.getElementById("round-modal-title");
+
+  if (roundId) {
+    const round = capTable.rounds.find((r) => r.id === roundId);
+    title.textContent = "Edit Round";
+    document.getElementById("round-name").value = round.name;
+    document.getElementById("round-price").value = round.pricePerShare || "";
+    document.getElementById("round-date").value = round.date;
+    document.getElementById("round-color").value = round.color;
+  } else {
+    title.textContent = "Add Round";
+    document.getElementById("round-name").value = "";
+    document.getElementById("round-price").value = "";
+    document.getElementById("round-date").value = new Date().toISOString().split("T")[0];
+    document.getElementById("round-color").value = "#" + Math.floor(Math.random() * 16777215).toString(16);
+  }
+
+  modal.classList.add("visible");
+}
+
+function closeRoundModal() {
+  document.getElementById("round-modal").classList.remove("visible");
+  editingRound = null;
+}
+
+function saveRound() {
+  const name = document.getElementById("round-name").value.trim();
+  const priceStr = document.getElementById("round-price").value.trim();
+  const date = document.getElementById("round-date").value;
+  const color = document.getElementById("round-color").value;
+
+  if (!name || !date) {
+    alert("Please fill in all required fields");
+    return;
+  }
+
+  const price = priceStr ? parseFloat(priceStr) : undefined;
+
+  if (editingRound) {
+    // Edit existing
+    const round = capTable.rounds.find((r) => r.id === editingRound);
+    round.name = name;
+    round.pricePerShare = price;
+    round.date = date;
+    round.color = color;
+  } else {
+    // Add new
+    const id = "round-" + Date.now();
+    capTable.rounds.push({
+      id,
+      name,
+      pricePerShare: price,
+      date,
+      color,
+      allocations: [],
+    });
+  }
+
+  saveData();
+  renderRoundsList();
+  updateLegend();
+  renderTreemap();
+  closeRoundModal();
+}
+
+function deleteRound(roundId) {
+  if (!confirm("Delete this round and all its allocations?")) return;
+
+  capTable.rounds = capTable.rounds.filter((r) => r.id !== roundId);
+  saveData();
+  renderRoundsList();
+  updateLegend();
+  renderTreemap();
+}
+
+window.editRound = openRoundModal;
+window.deleteRound = deleteRound;
+
+// Allocations Management
+function manageAllocations(roundId) {
+  editingRoundId = roundId;
+  const round = capTable.rounds.find((r) => r.id === roundId);
+
+  // Show modal with list of allocations
+  const modal = document.getElementById("allocation-modal");
+  const title = document.getElementById("allocation-modal-title");
+  title.textContent = `Manage Allocations - ${round.name}`;
+
+  // For now, just open add allocation modal
+  openAllocationModal(roundId);
+}
+
+function openAllocationModal(roundId, allocationId = null) {
+  editingRoundId = roundId;
+  editingAllocation = allocationId;
+  const modal = document.getElementById("allocation-modal");
+  const title = document.getElementById("allocation-modal-title");
+
+  if (allocationId) {
+    const round = capTable.rounds.find((r) => r.id === roundId);
+    const allocation = round.allocations.find((a) => a.id === allocationId);
+    title.textContent = "Edit Allocation";
+    document.getElementById("allocation-holder").value = allocation.holderName;
+    document.getElementById("allocation-shares").value = allocation.shares;
+    document.getElementById("allocation-type").value = allocation.type;
+    document.getElementById("allocation-vesting").value = allocation.vestingSchedule || "";
+    document.getElementById("allocation-notes").value = allocation.notes || "";
+  } else {
+    const round = capTable.rounds.find((r) => r.id === roundId);
+    title.textContent = `Add Allocation - ${round.name}`;
+    document.getElementById("allocation-holder").value = "";
+    document.getElementById("allocation-shares").value = "";
+    document.getElementById("allocation-type").value = "common";
+    document.getElementById("allocation-vesting").value = "";
+    document.getElementById("allocation-notes").value = "";
+  }
+
+  modal.classList.add("visible");
+}
+
+function closeAllocationModal() {
+  document.getElementById("allocation-modal").classList.remove("visible");
+  editingAllocation = null;
+  editingRoundId = null;
+}
+
+function saveAllocation() {
+  const holder = document.getElementById("allocation-holder").value.trim();
+  const sharesStr = document.getElementById("allocation-shares").value.trim();
+  const type = document.getElementById("allocation-type").value;
+  const vesting = document.getElementById("allocation-vesting").value.trim();
+  const notes = document.getElementById("allocation-notes").value.trim();
+
+  if (!holder || !sharesStr) {
+    alert("Please fill in holder name and shares");
+    return;
+  }
+
+  const shares = parseInt(sharesStr);
+  if (isNaN(shares) || shares <= 0) {
+    alert("Please enter a valid number of shares");
+    return;
+  }
+
+  const round = capTable.rounds.find((r) => r.id === editingRoundId);
+
+  if (editingAllocation) {
+    // Edit existing
+    const allocation = round.allocations.find((a) => a.id === editingAllocation);
+    allocation.holderName = holder;
+    allocation.shares = shares;
+    allocation.type = type;
+    allocation.vestingSchedule = vesting || undefined;
+    allocation.notes = notes || undefined;
+  } else {
+    // Add new
+    const id = "allocation-" + Date.now();
+    round.allocations.push({
+      id,
+      holderName: holder,
+      shares,
+      type,
+      vestingSchedule: vesting || undefined,
+      notes: notes || undefined,
+    });
+  }
+
+  saveData();
+  renderRoundsList();
+  updateStats();
+  renderTreemap();
+  closeAllocationModal();
+}
+
+function deleteAllocation(roundId, allocationId) {
+  if (!confirm("Delete this allocation?")) return;
+
+  const round = capTable.rounds.find((r) => r.id === roundId);
+  round.allocations = round.allocations.filter((a) => a.id !== allocationId);
+
+  saveData();
+  renderRoundsList();
+  updateStats();
+  renderTreemap();
+}
+
+window.manageAllocations = manageAllocations;
+window.openAllocationModal = openAllocationModal;
+window.deleteAllocation = deleteAllocation;
 
 // Start
 init();
