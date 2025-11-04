@@ -94,6 +94,31 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .join("g")
     .attr("transform", (d) => `translate(${d.x0},${d.y0})`);
 
+  // Create drop shadow filter
+  const defs = svg.select('defs').empty() ? svg.insert('defs', ':first-child') : svg.select('defs');
+
+  const dropShadow = defs.append('filter')
+    .attr('id', 'drop-shadow')
+    .attr('height', '130%');
+
+  dropShadow.append('feGaussianBlur')
+    .attr('in', 'SourceAlpha')
+    .attr('stdDeviation', 3);
+
+  dropShadow.append('feOffset')
+    .attr('dx', 2)
+    .attr('dy', 2)
+    .attr('result', 'offsetblur');
+
+  dropShadow.append('feComponentTransfer')
+    .append('feFuncA')
+    .attr('type', 'linear')
+    .attr('slope', 0.5);
+
+  const feMerge = dropShadow.append('feMerge');
+  feMerge.append('feMergeNode');
+  feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
   // Add rectangles with gradient for 3D effect (WinDirStat style)
   leaf
     .append("rect")
@@ -103,19 +128,15 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
       const gradientId = `gradient-${d.data.name.replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`;
 
       // Parse base color to create lighter/darker variants
-      const color = d3.color(baseColor);
-      const lighter = d3.color(baseColor).brighter(0.3);
-      const darker = d3.color(baseColor).darker(0.3);
+      const lighter = d3.color(baseColor).brighter(0.8);
+      const darker = d3.color(baseColor).darker(0.5);
 
-      // Create linear gradient
-      const defs = svg.select('defs').empty() ? svg.insert('defs', ':first-child') : svg.select('defs');
-
-      const gradient = defs.append('linearGradient')
+      // Create radial gradient for more pronounced 3D effect
+      const gradient = defs.append('radialGradient')
         .attr('id', gradientId)
-        .attr('x1', '0%')
-        .attr('y1', '0%')
-        .attr('x2', '100%')
-        .attr('y2', '100%');
+        .attr('cx', '30%')
+        .attr('cy', '30%')
+        .attr('r', '80%');
 
       gradient.append('stop')
         .attr('offset', '0%')
@@ -131,12 +152,11 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 
       return `url(#${gradientId})`;
     })
-    .attr("fill-opacity", (d) => {
-      // Rounds are more opaque, allocations slightly transparent
-      return d.depth === 1 ? 0.9 : 0.7;
-    })
-    .attr("stroke", "#fff")
-    .attr("stroke-width", 1)
+    .attr("fill-opacity", 1)
+    .attr("stroke", "#000")
+    .attr("stroke-width", 2)
+    .attr("stroke-opacity", 0.3)
+    .attr("filter", "url(#drop-shadow)")
     .attr("width", (d) => Math.max(0, d.x1 - d.x0))
     .attr("height", (d) => Math.max(0, d.y1 - d.y0))
     .style("cursor", "pointer")

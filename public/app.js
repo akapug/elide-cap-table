@@ -790,7 +790,20 @@ function openAllocationModal(roundId, allocationId = null) {
   } else {
     title.textContent = `Add Allocation - ${round.name}`;
     document.getElementById("allocation-holder").value = "";
-    document.getElementById("allocation-shares").value = "";
+
+    // Smart pre-fill: For priced rounds, calculate shares from money raised / price
+    // For SAFE rounds, leave empty (user enters investment amount)
+    let defaultValue = "";
+    if (round.type === 'priced' && round.moneyRaised && round.pricePerShare) {
+      // Calculate total shares for this round
+      const totalShares = Math.round(round.moneyRaised / round.pricePerShare);
+      // If this is the first allocation, suggest the full amount
+      if (round.allocations.length === 0) {
+        defaultValue = totalShares;
+      }
+    }
+
+    document.getElementById("allocation-shares").value = defaultValue;
     document.getElementById("allocation-type").value = "common";
     document.getElementById("allocation-vesting").value = "";
     document.getElementById("allocation-notes").value = "";
@@ -834,6 +847,27 @@ async function saveAllocation() {
     if (isNaN(shares) || shares <= 0) {
       alert("Please enter a valid number of shares");
       return;
+    }
+  }
+
+  // Validate: For priced rounds, check if allocations exceed money raised
+  if (round.type === 'priced' && round.moneyRaised && round.pricePerShare) {
+    const expectedTotalShares = Math.round(round.moneyRaised / round.pricePerShare);
+    const currentAllocated = round.allocations
+      .filter(a => !editingAllocation || a.id !== editingAllocation)
+      .reduce((sum, a) => sum + a.shares, 0);
+    const newTotal = currentAllocated + shares;
+
+    if (newTotal > expectedTotalShares) {
+      const overage = newTotal - expectedTotalShares;
+      const shouldContinue = confirm(
+        `Warning: Total allocated shares (${formatNumber(newTotal)}) exceeds round total (${formatNumber(expectedTotalShares)}) by ${formatNumber(overage)} shares.\n\n` +
+        `Expected from money raised: $${formatNumber(round.moneyRaised)} ÷ $${round.pricePerShare} = ${formatNumber(expectedTotalShares)} shares\n\n` +
+        `Do you want to continue anyway?`
+      );
+      if (!shouldContinue) {
+        return;
+      }
     }
   }
 
