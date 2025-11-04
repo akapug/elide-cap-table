@@ -989,6 +989,13 @@ function updateOfferCalculator() {
   const sharesInput = document.getElementById("allocation-shares").value.trim();
   const calculator = document.getElementById("offer-calculator");
 
+  // Only show calculator for equity-pool and priced rounds (NOT SAFE rounds)
+  const round = capTable.rounds.find((r) => r.id === editingRoundId);
+  if (!round || round.type === 'safe') {
+    calculator.style.display = "none";
+    return;
+  }
+
   if (!sharesInput || isNaN(sharesInput) || parseFloat(sharesInput) <= 0) {
     calculator.style.display = "none";
     return;
@@ -1086,6 +1093,25 @@ async function saveAllocation() {
       const shouldContinue = confirm(
         `Warning: Total allocated shares (${formatNumber(newTotal)}) exceeds round total (${formatNumber(expectedTotalShares)}) by ${formatNumber(overage)} shares.\n\n` +
         `Expected from money raised: $${formatNumber(round.moneyRaised)} ÷ $${round.pricePerShare} = ${formatNumber(expectedTotalShares)} shares\n\n` +
+        `Do you want to continue anyway?`
+      );
+      if (!shouldContinue) {
+        return;
+      }
+    }
+  }
+
+  // Validate: For SAFE rounds, check if total investment exceeds target
+  if (round.type === 'safe' && round.investmentAmount && investmentAmount) {
+    const currentInvested = round.allocations
+      .filter(a => !editingAllocation || a.id !== editingAllocation)
+      .reduce((sum, a) => sum + (a.investmentAmount || 0), 0);
+    const newTotal = currentInvested + investmentAmount;
+
+    if (newTotal > round.investmentAmount) {
+      const overage = newTotal - round.investmentAmount;
+      const shouldContinue = confirm(
+        `Warning: Total invested ($${formatNumber(newTotal)}) exceeds target ($${formatNumber(round.investmentAmount)}) by $${formatNumber(overage)}.\n\n` +
         `Do you want to continue anyway?`
       );
       if (!shouldContinue) {
