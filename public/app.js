@@ -218,6 +218,31 @@ async function saveData() {
   }
 }
 
+// Calculate effective price per share based on latest round
+function getEffectivePricePerShare() {
+  const totalIssued = capTable.rounds.reduce(
+    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
+    0
+  );
+
+  // Find the most recent priced round
+  const pricedRounds = capTable.rounds.filter(r => r.type === 'priced' && r.pricePerShare);
+  if (pricedRounds.length > 0) {
+    // Use the last priced round's price
+    const lastPricedRound = pricedRounds[pricedRounds.length - 1];
+    return lastPricedRound.pricePerShare;
+  } else {
+    // No priced rounds yet - use SAFE valuation cap if available
+    const safeRounds = capTable.rounds.filter(r => r.type === 'safe' && r.valuationCap);
+    if (safeRounds.length > 0) {
+      // Use the highest SAFE valuation cap as proxy
+      const highestCap = Math.max(...safeRounds.map(r => r.valuationCap));
+      return totalIssued > 0 ? highestCap / totalIssued : 0;
+    }
+  }
+  return 0;
+}
+
 // Update statistics
 function updateStats() {
   const totalIssued = capTable.rounds.reduce(
@@ -228,26 +253,8 @@ function updateStats() {
   const totalHolders = capTable.rounds.reduce((sum, round) => sum + round.allocations.length, 0);
 
   // Calculate current effective valuation and price per share
-  let effectiveValuation = 0;
-  let effectivePricePerShare = 0;
-
-  // Find the most recent priced round
-  const pricedRounds = capTable.rounds.filter(r => r.type === 'priced' && r.pricePerShare);
-  if (pricedRounds.length > 0) {
-    // Use the last priced round's price
-    const lastPricedRound = pricedRounds[pricedRounds.length - 1];
-    effectivePricePerShare = lastPricedRound.pricePerShare;
-    effectiveValuation = totalIssued * effectivePricePerShare;
-  } else {
-    // No priced rounds yet - use SAFE valuation cap if available
-    const safeRounds = capTable.rounds.filter(r => r.type === 'safe' && r.valuationCap);
-    if (safeRounds.length > 0) {
-      // Use the highest SAFE valuation cap as proxy
-      const highestCap = Math.max(...safeRounds.map(r => r.valuationCap));
-      effectiveValuation = highestCap;
-      effectivePricePerShare = totalIssued > 0 ? highestCap / totalIssued : 0;
-    }
-  }
+  const effectivePricePerShare = getEffectivePricePerShare();
+  const effectiveValuation = totalIssued * effectivePricePerShare;
 
   document.getElementById("stat-allocated").textContent = formatNumber(totalIssued);
   document.getElementById("stat-unallocated").textContent = formatNumber(remaining);
@@ -259,6 +266,9 @@ function updateStats() {
   document.getElementById("stat-price-per-share").textContent = effectivePricePerShare > 0
     ? `$${effectivePricePerShare.toFixed(4)}`
     : 'N/A';
+
+  // Store globally for treemap renderer
+  window._effectivePricePerShare = effectivePricePerShare;
 }
 
 // Toggle stats modal

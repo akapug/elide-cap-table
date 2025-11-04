@@ -104,17 +104,17 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 
   dropShadow.append('feGaussianBlur')
     .attr('in', 'SourceAlpha')
-    .attr('stdDeviation', 5);  // Increased from 3 to 5
+    .attr('stdDeviation', 6);  // Increased from 5 to 6 for more blur
 
   dropShadow.append('feOffset')
-    .attr('dx', 4)  // Increased from 2 to 4
-    .attr('dy', 4)  // Increased from 2 to 4
+    .attr('dx', 5)  // Increased from 4 to 5
+    .attr('dy', 5)  // Increased from 4 to 5
     .attr('result', 'offsetblur');
 
   dropShadow.append('feComponentTransfer')
     .append('feFuncA')
     .attr('type', 'linear')
-    .attr('slope', 0.7);  // Increased from 0.5 to 0.7 for darker shadow
+    .attr('slope', 0.9);  // Increased from 0.7 to 0.9 for much darker shadow
 
   const feMerge = dropShadow.append('feMerge');
   feMerge.append('feMergeNode');
@@ -128,9 +128,9 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
       // Create a unique gradient ID for each node
       const gradientId = `gradient-${d.data.name.replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`;
 
-      // Parse base color to create lighter/darker variants
-      const lighter = d3.color(baseColor).brighter(0.8);
-      const darker = d3.color(baseColor).darker(0.5);
+      // Parse base color to create lighter/darker variants with more contrast
+      const lighter = d3.color(baseColor).brighter(1.0);  // Increased from 0.8 to 1.0
+      const darker = d3.color(baseColor).darker(1.2);     // Increased from 0.5 to 1.2 for much darker edges
 
       // Create radial gradient for more pronounced 3D effect
       const gradient = defs.append('radialGradient')
@@ -259,6 +259,27 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .attr("font-size", "9px")
     .attr("opacity", 0.8)
     .attr("font-weight", "bold")
+    .style("pointer-events", "none");
+
+  // Add estimated value for allocations (fourth line)
+  leaf
+    .filter((d) => d.depth === 2)
+    .append("text")
+    .attr("x", 4)
+    .attr("y", 50)
+    .text((d) => {
+      const width = d.x1 - d.x0;
+      const height = d.y1 - d.y0;
+      const effectivePrice = window._effectivePricePerShare || 0;
+      if (width > 60 && height > 55 && viewMode === "shares" && effectivePrice > 0) {
+        const estimatedValue = d.value * effectivePrice;
+        return "$" + formatNumber(Math.round(estimatedValue));
+      }
+      return "";
+    })
+    .attr("fill", "#fff")
+    .attr("font-size", "9px")
+    .attr("opacity", 0.7)
     .style("pointer-events", "none");
 
   // Tooltip - remove any existing tooltips first
@@ -397,7 +418,14 @@ function createTooltipHTML(d, capTable, viewMode) {
 
     const ownership = ((d.data.shares / window._totalIssuedShares) * 100).toFixed(2);
     lines.push(`<div>Ownership: ${ownership}%</div>`);
-    
+
+    // Add estimated value if effective price is available
+    const effectivePrice = window._effectivePricePerShare || 0;
+    if (effectivePrice > 0) {
+      const estimatedValue = d.data.shares * effectivePrice;
+      lines.push(`<div style="color: #4ade80;">Est. Value: $${formatNumber(Math.round(estimatedValue))}</div>`);
+    }
+
     if (d.data.vestingSchedule) {
       lines.push(`<div>Vesting: ${d.data.vestingSchedule}</div>`);
     }
