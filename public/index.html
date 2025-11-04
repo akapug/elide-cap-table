@@ -431,6 +431,29 @@
     .section-header h2 {
       margin-bottom: 0;
     }
+
+    /* Toast notification animations */
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -484,9 +507,10 @@
               <option value="current">Current (Live Data)</option>
             </select>
             <div style="display: flex; gap: 8px;">
-              <button id="save-scenario" class="secondary" style="flex: 1;">Save As...</button>
-              <button id="delete-scenario" class="secondary" style="flex: 1;">Delete</button>
+              <button id="save-scenario-quick" class="secondary" style="flex: 1;" title="Save changes to current scenario">💾 Save</button>
+              <button id="save-scenario" class="secondary" style="flex: 1;" title="Save as new scenario">Save As...</button>
             </div>
+            <button id="delete-scenario" class="secondary" style="width: 100%;">Delete Scenario</button>
           </div>
         </div>
 

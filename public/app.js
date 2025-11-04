@@ -58,6 +58,35 @@ function initEventListeners() {
   // Offer calculator - update as user types shares
   document.getElementById("allocation-shares").addEventListener("input", updateOfferCalculator);
 
+  // Global keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    // ESC to close modals
+    if (e.key === "Escape") {
+      const visibleModals = document.querySelectorAll(".modal.visible");
+      if (visibleModals.length > 0) {
+        const lastModal = visibleModals[visibleModals.length - 1];
+        const closeBtn = lastModal.querySelector(".modal-close");
+        if (closeBtn) closeBtn.click();
+      }
+    }
+
+    // Enter to submit forms (when focused in modal inputs)
+    if (e.key === "Enter" && !e.shiftKey) {
+      const activeElement = document.activeElement;
+      if (activeElement && activeElement.tagName === "INPUT" && activeElement.type !== "textarea") {
+        const modal = activeElement.closest(".modal");
+        if (modal && modal.classList.contains("visible")) {
+          // Find the primary save button in the modal
+          const saveBtn = modal.querySelector("button[id$='-save']");
+          if (saveBtn) {
+            e.preventDefault();
+            saveBtn.click();
+          }
+        }
+      }
+    }
+  });
+
   // CSV import/export
   document.getElementById("export-csv").addEventListener("click", () => exportToCSV(capTable));
   document.getElementById("import-csv").addEventListener("click", () => {
@@ -73,6 +102,9 @@ function initEventListeners() {
       capTable = loadedCapTable;
       refreshUI();
     }
+  });
+  document.getElementById("save-scenario-quick").addEventListener("click", () => {
+    ScenarioManager.quickSaveScenario(capTable);
   });
   document.getElementById("save-scenario").addEventListener("click", () => {
     ScenarioManager.saveScenario(capTable);
@@ -661,6 +693,9 @@ function openRoundModal(roundId = null) {
 
   toggleRoundTypeFields();
   modal.classList.add("visible");
+
+  // Auto-focus first input
+  setTimeout(() => document.getElementById("round-name").focus(), 100);
 }
 
 function closeRoundModal() {
@@ -679,9 +714,42 @@ async function saveRound() {
   const date = document.getElementById("round-date").value;
   const color = document.getElementById("round-color").value;
 
-  if (!name || !date) {
-    alert("Please fill in all required fields");
+  if (!name) {
+    alert("❌ Round name is required");
+    document.getElementById("round-name").focus();
     return;
+  }
+
+  if (!date) {
+    alert("❌ Date is required");
+    document.getElementById("round-date").focus();
+    return;
+  }
+
+  // Validate type-specific required fields
+  if (type === "priced") {
+    if (!price || price <= 0) {
+      alert("❌ Price per share must be greater than 0 for priced rounds");
+      document.getElementById("round-price").focus();
+      return;
+    }
+    if (!moneyRaised || moneyRaised <= 0) {
+      alert("❌ Money raised must be greater than 0 for priced rounds");
+      document.getElementById("round-money-raised").focus();
+      return;
+    }
+  } else if (type === "safe") {
+    if (!cap || cap <= 0) {
+      alert("❌ Valuation cap must be greater than 0 for SAFE rounds");
+      document.getElementById("round-valuation-cap").focus();
+      return;
+    }
+  } else if (type === "pool") {
+    if (!poolAuthorized || poolAuthorized <= 0) {
+      alert("❌ Pool authorized shares must be greater than 0");
+      document.getElementById("round-pool-authorized").focus();
+      return;
+    }
   }
 
   const price = priceStr ? parseFloat(priceStr) : undefined;
@@ -890,6 +958,9 @@ function openAllocationModal(roundId, allocationId = null) {
 
   // Update offer calculator on modal open
   updateOfferCalculator();
+
+  // Auto-focus first input
+  setTimeout(() => document.getElementById("allocation-holder").focus(), 100);
 }
 
 function closeAllocationModal() {
@@ -945,8 +1016,17 @@ async function saveAllocation() {
   const vesting = document.getElementById("allocation-vesting").value.trim();
   const notes = document.getElementById("allocation-notes").value.trim();
 
-  if (!holder || !sharesStr) {
-    alert("Please fill in holder name and shares/investment amount");
+  if (!holder) {
+    alert("❌ Holder name is required");
+    document.getElementById("allocation-holder").focus();
+    return;
+  }
+
+  if (!sharesStr) {
+    const round = capTable.rounds.find((r) => r.id === editingRoundId);
+    const fieldName = round.type === 'safe' ? 'investment amount' : 'shares';
+    alert(`❌ ${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)} is required`);
+    document.getElementById("allocation-shares").focus();
     return;
   }
 
@@ -957,7 +1037,8 @@ async function saveAllocation() {
   if (round.type === 'safe' && round.valuationCap) {
     investmentAmount = parseFloat(sharesStr);
     if (isNaN(investmentAmount) || investmentAmount <= 0) {
-      alert("Please enter a valid investment amount");
+      alert("❌ Investment amount must be greater than 0");
+      document.getElementById("allocation-shares").focus();
       return;
     }
     // Calculate ownership percentage: investment / valuation cap
@@ -974,7 +1055,8 @@ async function saveAllocation() {
   } else {
     shares = parseInt(sharesStr);
     if (isNaN(shares) || shares <= 0) {
-      alert("Please enter a valid number of shares");
+      alert("❌ Number of shares must be greater than 0");
+      document.getElementById("allocation-shares").focus();
       return;
     }
   }
