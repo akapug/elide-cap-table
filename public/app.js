@@ -2,6 +2,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { exportToCSV, parseCSV, downloadCSVTemplate } from "./csv-handler.js";
 import { renderTreemap as renderTreemapModule } from "./treemap-renderer.js";
 import * as ScenarioManager from "./scenario-manager.js";
+import { calculateDilution, formatOwnership, formatCurrency } from "./dilution-calculator.js";
 
 // State
 let capTable = null;
@@ -63,6 +64,10 @@ async function init() {
   document.getElementById("round-cancel").addEventListener("click", closeRoundModal);
   document.getElementById("round-save").addEventListener("click", saveRound);
   document.getElementById("round-type").addEventListener("change", toggleRoundTypeFields);
+
+  // Dilution preview - update when price or money raised changes
+  document.getElementById("round-price").addEventListener("input", updateDilutionPreview);
+  document.getElementById("round-money-raised").addEventListener("input", updateDilutionPreview);
 
   // Allocations list modal
   document.getElementById("allocations-list-close").addEventListener("click", closeAllocationsListModal);
@@ -426,10 +431,6 @@ function formatNumber(num) {
   return num.toLocaleString();
 }
 
-function formatCurrency(num) {
-  return "$" + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 function calculatePercentage(part, total) {
   return ((part / total) * 100).toFixed(2) + "%";
 }
@@ -471,18 +472,80 @@ function renderRoundsList() {
 function toggleRoundTypeFields() {
   const type = document.getElementById("round-type").value;
   const priceGroup = document.getElementById("price-group");
+  const moneyRaisedGroup = document.getElementById("money-raised-group");
   const capGroup = document.getElementById("valuation-cap-group");
+  const investmentGroup = document.getElementById("investment-amount-group");
+  const dilutionPreview = document.getElementById("dilution-preview");
 
   if (type === "safe") {
     priceGroup.style.display = "none";
+    moneyRaisedGroup.style.display = "none";
     capGroup.style.display = "block";
+    investmentGroup.style.display = "block";
+    dilutionPreview.style.display = "none";
   } else if (type === "equity-pool") {
     priceGroup.style.display = "none";
+    moneyRaisedGroup.style.display = "none";
     capGroup.style.display = "none";
+    investmentGroup.style.display = "none";
+    dilutionPreview.style.display = "none";
   } else {
+    // Priced round
     priceGroup.style.display = "block";
+    moneyRaisedGroup.style.display = "block";
     capGroup.style.display = "none";
+    investmentGroup.style.display = "none";
+    dilutionPreview.style.display = "block";
+    updateDilutionPreview();
   }
+}
+
+function updateDilutionPreview() {
+  const priceStr = document.getElementById("round-price").value.trim();
+  const moneyRaisedStr = document.getElementById("round-money-raised").value.trim();
+  const previewDiv = document.getElementById("dilution-preview-content");
+
+  if (!priceStr || !moneyRaisedStr) {
+    previewDiv.innerHTML = '<div style="color: #9ca3af;">Enter price per share and money raised to see dilution impact</div>';
+    return;
+  }
+
+  const pricePerShare = parseFloat(priceStr);
+  const moneyRaised = parseFloat(moneyRaisedStr);
+
+  if (isNaN(pricePerShare) || isNaN(moneyRaised) || pricePerShare <= 0 || moneyRaised <= 0) {
+    previewDiv.innerHTML = '<div style="color: #9ca3af;">Enter valid numbers</div>';
+    return;
+  }
+
+  const dilution = calculateDilution(capTable, moneyRaised, pricePerShare);
+
+  const lines = [];
+  lines.push(`<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">`);
+  lines.push(`  <div><strong>Pre-Money:</strong> ${formatCurrency(dilution.preMoney)}</div>`);
+  lines.push(`  <div><strong>Post-Money:</strong> ${formatCurrency(dilution.postMoney)}</div>`);
+  lines.push(`</div>`);
+  lines.push(`<div style="margin-bottom: 8px;"><strong>New Shares:</strong> ${dilution.newShares.toLocaleString()}</div>`);
+
+  // Show top diluted holders
+  const sortedDilution = Array.from(dilution.dilutionImpact.entries())
+    .sort((a, b) => b[1].currentOwnership - a[1].currentOwnership)
+    .slice(0, 5);
+
+  if (sortedDilution.length > 0) {
+    lines.push(`<div style="margin-top: 8px; font-size: 11px;">`);
+    lines.push(`  <div style="font-weight: bold; margin-bottom: 4px;">Top Holders:</div>`);
+    sortedDilution.forEach(([holder, data]) => {
+      const arrow = data.dilution > 0 ? '↓' : '';
+      lines.push(`  <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">`);
+      lines.push(`    <span>${holder}:</span>`);
+      lines.push(`    <span>${formatOwnership(data.currentOwnership)} ${arrow} ${formatOwnership(data.postMoneyOwnership)}</span>`);
+      lines.push(`  </div>`);
+    });
+    lines.push(`</div>`);
+  }
+
+  previewDiv.innerHTML = lines.join('');
 }
 
 function openRoundModal(roundId = null) {
@@ -496,7 +559,9 @@ function openRoundModal(roundId = null) {
     document.getElementById("round-name").value = round.name;
     document.getElementById("round-type").value = round.type || "priced";
     document.getElementById("round-price").value = round.pricePerShare || "";
+    document.getElementById("round-money-raised").value = round.moneyRaised || "";
     document.getElementById("round-valuation-cap").value = round.valuationCap || "";
+    document.getElementById("round-investment-amount").value = round.investmentAmount || "";
     document.getElementById("round-date").value = round.date;
     document.getElementById("round-color").value = round.color;
   } else {
@@ -504,7 +569,9 @@ function openRoundModal(roundId = null) {
     document.getElementById("round-name").value = "";
     document.getElementById("round-type").value = "priced";
     document.getElementById("round-price").value = "";
+    document.getElementById("round-money-raised").value = "";
     document.getElementById("round-valuation-cap").value = "";
+    document.getElementById("round-investment-amount").value = "";
     document.getElementById("round-date").value = new Date().toISOString().split("T")[0];
     document.getElementById("round-color").value = "#" + Math.floor(Math.random() * 16777215).toString(16);
   }
@@ -522,7 +589,9 @@ async function saveRound() {
   const name = document.getElementById("round-name").value.trim();
   const type = document.getElementById("round-type").value;
   const priceStr = document.getElementById("round-price").value.trim();
+  const moneyRaisedStr = document.getElementById("round-money-raised").value.trim();
   const capStr = document.getElementById("round-valuation-cap").value.trim();
+  const investmentStr = document.getElementById("round-investment-amount").value.trim();
   const date = document.getElementById("round-date").value;
   const color = document.getElementById("round-color").value;
 
@@ -532,7 +601,9 @@ async function saveRound() {
   }
 
   const price = priceStr ? parseFloat(priceStr) : undefined;
+  const moneyRaised = moneyRaisedStr ? parseFloat(moneyRaisedStr) : undefined;
   const cap = capStr ? parseFloat(capStr) : undefined;
+  const investment = investmentStr ? parseFloat(investmentStr) : undefined;
 
   if (editingRound) {
     // Edit existing
@@ -540,7 +611,9 @@ async function saveRound() {
     round.name = name;
     round.type = type;
     round.pricePerShare = type === "priced" ? price : undefined;
+    round.moneyRaised = type === "priced" ? moneyRaised : undefined;
     round.valuationCap = type === "safe" ? cap : undefined;
+    round.investmentAmount = type === "safe" ? investment : undefined;
     round.date = date;
     round.color = color;
   } else {
@@ -551,7 +624,9 @@ async function saveRound() {
       name,
       type,
       pricePerShare: type === "priced" ? price : undefined,
+      moneyRaised: type === "priced" ? moneyRaised : undefined,
       valuationCap: type === "safe" ? cap : undefined,
+      investmentAmount: type === "safe" ? investment : undefined,
       date,
       color,
       allocations: [],

@@ -555,10 +555,18 @@
         <label>Price Per Share</label>
         <input type="number" step="0.01" id="round-price" placeholder="2.00">
       </div>
+    <div class="form-group" id="money-raised-group">
+        <label>Money Raised</label>
+        <input type="number" step="1" id="round-money-raised" placeholder="5000000">
+      </div>
     <div class="form-group" id="valuation-cap-group" style="display: none;">
       <label>Valuation Cap</label>
       <input type="number" step="1" id="round-valuation-cap" placeholder="10000000">
     </div>
+    <div class="form-group" id="investment-amount-group" style="display: none;">
+        <label>Investment Amount</label>
+        <input type="number" step="1" id="round-investment-amount" placeholder="400000">
+      </div>
       <div class="form-group">
         <label>Date</label>
         <input type="date" id="round-date">
@@ -567,6 +575,13 @@
         <label>Color</label>
         <input type="color" id="round-color" value="#3b82f6">
       </div>
+
+      <!-- Dilution Preview (only shown for priced rounds) -->
+      <div id="dilution-preview" style="display: none; background: #1f2937; padding: 12px; border-radius: 4px; margin-top: 12px;">
+        <div style="font-weight: bold; margin-bottom: 8px;">Dilution Preview</div>
+        <div id="dilution-preview-content"></div>
+      </div>
+
       <div class="modal-actions">
         <button class="secondary" id="round-cancel">Cancel</button>
         <button id="round-save">Save Round</button>
@@ -628,7 +643,7 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=9"></script>
+  <script type="module" src="/app.js?v=10"></script>
 </body>
 </html>
 

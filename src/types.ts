@@ -19,6 +19,8 @@ export interface Round {
   type?: "priced" | "safe" | "equity-pool"; // Round type (defaults to priced)
   pricePerShare?: number; // For priced rounds
   valuationCap?: number; // For SAFE rounds
+  moneyRaised?: number; // Amount raised in this round (for priced rounds)
+  investmentAmount?: number; // Investment amount (for SAFE rounds)
   date: string; // ISO date string
   allocations: Allocation[];
   color: string; // Hex color for this round
