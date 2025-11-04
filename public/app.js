@@ -714,7 +714,12 @@ function manageAllocations(roundId) {
       const item = document.createElement("div");
       item.className = "list-item";
 
-      let details = `${formatNumber(allocation.shares)} shares • ${allocation.type}`;
+      let details;
+      if (round.type === 'safe' && allocation.investmentAmount) {
+        details = `${formatCurrency(allocation.investmentAmount)} → ${formatNumber(allocation.shares)} shares • ${allocation.type}`;
+      } else {
+        details = `${formatNumber(allocation.shares)} shares • ${allocation.type}`;
+      }
       if (allocation.vestingSchedule) {
         details += ` • ${allocation.vestingSchedule}`;
       }
@@ -747,18 +752,32 @@ function openAllocationModal(roundId, allocationId = null) {
   editingAllocation = allocationId;
   const modal = document.getElementById("allocation-modal");
   const title = document.getElementById("allocation-modal-title");
+  const round = capTable.rounds.find((r) => r.id === roundId);
+
+  // Update label based on round type
+  const sharesLabel = document.querySelector('label[for="allocation-shares"]');
+  if (round.type === 'safe') {
+    sharesLabel.textContent = 'Investment Amount ($)';
+    document.getElementById("allocation-shares").placeholder = "100000";
+  } else {
+    sharesLabel.textContent = 'Shares';
+    document.getElementById("allocation-shares").placeholder = "100000";
+  }
 
   if (allocationId) {
-    const round = capTable.rounds.find((r) => r.id === roundId);
     const allocation = round.allocations.find((a) => a.id === allocationId);
     title.textContent = "Edit Allocation";
     document.getElementById("allocation-holder").value = allocation.holderName;
-    document.getElementById("allocation-shares").value = allocation.shares;
+    // For SAFE rounds, show investment amount; otherwise show shares
+    if (round.type === 'safe' && allocation.investmentAmount) {
+      document.getElementById("allocation-shares").value = allocation.investmentAmount;
+    } else {
+      document.getElementById("allocation-shares").value = allocation.shares;
+    }
     document.getElementById("allocation-type").value = allocation.type;
     document.getElementById("allocation-vesting").value = allocation.vestingSchedule || "";
     document.getElementById("allocation-notes").value = allocation.notes || "";
   } else {
-    const round = capTable.rounds.find((r) => r.id === roundId);
     title.textContent = `Add Allocation - ${round.name}`;
     document.getElementById("allocation-holder").value = "";
     document.getElementById("allocation-shares").value = "";
@@ -784,23 +803,36 @@ async function saveAllocation() {
   const notes = document.getElementById("allocation-notes").value.trim();
 
   if (!holder || !sharesStr) {
-    alert("Please fill in holder name and shares");
-    return;
-  }
-
-  const shares = parseInt(sharesStr);
-  if (isNaN(shares) || shares <= 0) {
-    alert("Please enter a valid number of shares");
+    alert("Please fill in holder name and shares/investment amount");
     return;
   }
 
   const round = capTable.rounds.find((r) => r.id === editingRoundId);
+
+  // For SAFE rounds, treat input as investment amount and calculate shares
+  let shares, investmentAmount;
+  if (round.type === 'safe' && round.valuationCap) {
+    investmentAmount = parseFloat(sharesStr);
+    if (isNaN(investmentAmount) || investmentAmount <= 0) {
+      alert("Please enter a valid investment amount");
+      return;
+    }
+    // Calculate implied shares: (investment / valuation cap) × authorized shares
+    shares = Math.round((investmentAmount / round.valuationCap) * capTable.authorizedShares);
+  } else {
+    shares = parseInt(sharesStr);
+    if (isNaN(shares) || shares <= 0) {
+      alert("Please enter a valid number of shares");
+      return;
+    }
+  }
 
   if (editingAllocation) {
     // Edit existing
     const allocation = round.allocations.find((a) => a.id === editingAllocation);
     allocation.holderName = holder;
     allocation.shares = shares;
+    allocation.investmentAmount = investmentAmount;
     allocation.type = type;
     allocation.vestingSchedule = vesting || undefined;
     allocation.notes = notes || undefined;
@@ -811,6 +843,7 @@ async function saveAllocation() {
       id,
       holderName: holder,
       shares,
+      investmentAmount,
       type,
       vestingSchedule: vesting || undefined,
       notes: notes || undefined,

@@ -13,6 +13,7 @@ export function exportToCSV(capTable) {
     'Color',
     'Holder Name',
     'Shares',
+    'Investment Amount',
     'Type',
     'Vesting Schedule',
     'Notes'
@@ -33,6 +34,7 @@ export function exportToCSV(capTable) {
         '',
         '',
         '',
+        '',
         ''
       ]);
     } else {
@@ -47,6 +49,7 @@ export function exportToCSV(capTable) {
           round.color,
           allocation.holderName,
           allocation.shares,
+          allocation.investmentAmount || '',
           allocation.type,
           allocation.vestingSchedule || '',
           allocation.notes || ''
@@ -123,6 +126,7 @@ export function parseCSV(csvText) {
       color,
       holderName,
       shares,
+      investmentAmount,
       type,
       vestingSchedule,
       notes
@@ -151,6 +155,7 @@ export function parseCSV(csvText) {
         id: 'allocation-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         holderName,
         shares: parseInt(shares),
+        investmentAmount: investmentAmount ? parseFloat(investmentAmount) : undefined,
         type: type || 'common',
         vestingSchedule: vestingSchedule || undefined,
         notes: notes || undefined
@@ -163,12 +168,12 @@ export function parseCSV(csvText) {
 
 export function downloadCSVTemplate() {
   const template = [
-    ['Round Name', 'Round Type', 'Price Per Share', 'Valuation Cap', 'Date', 'Color', 'Holder Name', 'Shares', 'Type', 'Vesting Schedule', 'Notes'],
-    ['Common Shares', 'priced', '', '', '2020-01-01', '#3b82f6', 'Founder 1', '5000000', 'common', '', ''],
-    ['Common Shares', 'priced', '', '', '2020-01-01', '#3b82f6', 'Founder 2', '3000000', 'common', '', ''],
-    ['Pre-Seed SAFE', 'safe', '', '10000000', '2023-01-01', '#10b981', 'Angel Investor 1', '200000', 'preferred', '', ''],
-    ['Pre-Seed SAFE', 'safe', '', '10000000', '2023-01-01', '#10b981', 'Angel Investor 2', '200000', 'preferred', '', ''],
-    ['2024 Equity Plan', 'equity-pool', '', '', '2024-01-01', '#f59e0b', 'Employee Pool', '1000000', 'option', '4 year vest, 1 year cliff', 'Unallocated options'],
+    ['Round Name', 'Round Type', 'Price Per Share', 'Valuation Cap', 'Date', 'Color', 'Holder Name', 'Shares', 'Investment Amount', 'Type', 'Vesting Schedule', 'Notes'],
+    ['Common Shares', 'priced', '', '', '2020-01-01', '#3b82f6', 'Founder 1', '5000000', '', 'common', '', ''],
+    ['Common Shares', 'priced', '', '', '2020-01-01', '#3b82f6', 'Founder 2', '3000000', '', 'common', '', ''],
+    ['Pre-Seed SAFE', 'safe', '', '10000000', '2023-01-01', '#10b981', 'Angel Investor 1', '200000', '400000', 'preferred', '', ''],
+    ['Pre-Seed SAFE', 'safe', '', '10000000', '2023-01-01', '#10b981', 'Angel Investor 2', '200000', '400000', 'preferred', '', ''],
+    ['2024 Equity Plan', 'equity-pool', '', '', '2024-01-01', '#f59e0b', 'Employee Pool', '1000000', '', 'option', '4 year vest, 1 year cliff', 'Unallocated options'],
   ];
   
   const csvContent = template.map(row => row.join(',')).join('\n');
