@@ -12,13 +12,31 @@ let editingRoundId = null;
 
 // Initialize
 async function init() {
-  // Load data from localStorage or use sample
-  const saved = localStorage.getItem("capTable");
-  if (saved) {
-    capTable = JSON.parse(saved);
-  } else {
-    capTable = createSampleCapTable();
-    saveData();
+  // Load data from API (SQLite backend) with localStorage fallback
+  try {
+    const response = await fetch("/api/captable");
+    if (response.ok) {
+      capTable = await response.json();
+    } else {
+      // Fallback to localStorage
+      const saved = localStorage.getItem("capTable");
+      if (saved) {
+        capTable = JSON.parse(saved);
+      } else {
+        capTable = createSampleCapTable();
+        await saveData();
+      }
+    }
+  } catch (error) {
+    console.warn("API not available, using localStorage:", error);
+    // Fallback to localStorage
+    const saved = localStorage.getItem("capTable");
+    if (saved) {
+      capTable = JSON.parse(saved);
+    } else {
+      capTable = createSampleCapTable();
+      await saveData();
+    }
   }
 
   // Set company name
@@ -79,13 +97,13 @@ function handleCSVImport(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const rounds = parseCSV(e.target.result);
 
       if (confirm(`Import ${rounds.length} rounds? This will replace existing rounds.`)) {
         capTable.rounds = rounds;
-        saveData();
+        await saveData();
         renderRoundsList();
         updateStats();
         updateLegend();
@@ -119,18 +137,34 @@ function toggleSidebar() {
 }
 
 // Save company info
-function saveCompanyInfo() {
+async function saveCompanyInfo() {
   capTable.companyName = document.getElementById("input-company-name").value;
   capTable.authorizedShares = parseInt(document.getElementById("input-authorized-shares").value);
   document.getElementById("company-name").textContent = capTable.companyName;
-  saveData();
+  await saveData();
   updateStats();
   renderTreemap();
 }
 
-// Save to localStorage
-function saveData() {
-  localStorage.setItem("capTable", JSON.stringify(capTable));
+// Save to API (SQLite) with localStorage fallback
+async function saveData() {
+  try {
+    const response = await fetch("/api/captable", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(capTable),
+    });
+
+    if (!response.ok) {
+      throw new Error("API save failed");
+    }
+
+    // Also save to localStorage as backup
+    localStorage.setItem("capTable", JSON.stringify(capTable));
+  } catch (error) {
+    console.warn("API not available, using localStorage only:", error);
+    localStorage.setItem("capTable", JSON.stringify(capTable));
+  }
 }
 
 // Update statistics
@@ -453,7 +487,7 @@ function closeRoundModal() {
   editingRound = null;
 }
 
-function saveRound() {
+async function saveRound() {
   const name = document.getElementById("round-name").value.trim();
   const type = document.getElementById("round-type").value;
   const priceStr = document.getElementById("round-price").value.trim();
@@ -493,18 +527,18 @@ function saveRound() {
     });
   }
 
-  saveData();
+  await saveData();
   renderRoundsList();
   updateLegend();
   renderTreemap();
   closeRoundModal();
 }
 
-function deleteRound(roundId) {
+async function deleteRound(roundId) {
   if (!confirm("Delete this round and all its allocations?")) return;
 
   capTable.rounds = capTable.rounds.filter((r) => r.id !== roundId);
-  saveData();
+  await saveData();
   renderRoundsList();
   updateLegend();
   renderTreemap();
@@ -596,7 +630,7 @@ function closeAllocationModal() {
   // Don't clear editingRoundId - we might be returning to allocations list
 }
 
-function saveAllocation() {
+async function saveAllocation() {
   const holder = document.getElementById("allocation-holder").value.trim();
   const sharesStr = document.getElementById("allocation-shares").value.trim();
   const type = document.getElementById("allocation-type").value;
@@ -637,7 +671,7 @@ function saveAllocation() {
     });
   }
 
-  saveData();
+  await saveData();
   renderRoundsList();
   updateStats();
   renderTreemap();
@@ -653,13 +687,13 @@ function editAllocation(roundId, allocationId) {
   openAllocationModal(roundId, allocationId);
 }
 
-function deleteAllocation(roundId, allocationId) {
+async function deleteAllocation(roundId, allocationId) {
   if (!confirm("Delete this allocation?")) return;
 
   const round = capTable.rounds.find((r) => r.id === roundId);
   round.allocations = round.allocations.filter((a) => a.id !== allocationId);
 
-  saveData();
+  await saveData();
   renderRoundsList();
   updateStats();
   renderTreemap();

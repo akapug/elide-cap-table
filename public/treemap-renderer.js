@@ -37,34 +37,42 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 
   treemap(hierarchy);
 
-  // If zoomed, rescale
-  let nodes = hierarchy.descendants();
+  // Determine which nodes to show
+  let nodesToShow;
+
   if (zoomNode) {
-    const zoomedNode = nodes.find((n) => n.data.name === zoomNode.data.name);
-    if (zoomedNode) {
+    // When zoomed, find the zoomed node and rescale its children
+    const allNodes = hierarchy.descendants();
+    const zoomedNode = allNodes.find((n) => n.data.name === zoomNode.data.name);
+
+    if (zoomedNode && zoomedNode.children) {
       const scaleX = width / (zoomedNode.x1 - zoomedNode.x0);
       const scaleY = height / (zoomedNode.y1 - zoomedNode.y0);
       const offsetX = zoomedNode.x0;
       const offsetY = zoomedNode.y0;
 
-      nodes.forEach((node) => {
+      // Rescale all nodes
+      allNodes.forEach((node) => {
         node.x0 = (node.x0 - offsetX) * scaleX;
         node.x1 = (node.x1 - offsetX) * scaleX;
         node.y0 = (node.y0 - offsetY) * scaleY;
         node.y1 = (node.y1 - offsetY) * scaleY;
       });
 
-      // Filter to only show zoomed node and its descendants
-      nodes = nodes.filter(
-        (n) => n === zoomedNode || n.ancestors().includes(zoomedNode)
-      );
+      // Show only the direct children of the zoomed node
+      nodesToShow = zoomedNode.children;
+    } else {
+      nodesToShow = [];
     }
+  } else {
+    // When not zoomed, show only the direct children of root (rounds, not allocations)
+    nodesToShow = hierarchy.children || [];
   }
 
   // Create groups for each node
   const leaf = svg
     .selectAll("g")
-    .data(nodes.filter((d) => d.depth > 0))
+    .data(nodesToShow)
     .join("g")
     .attr("transform", (d) => `translate(${d.x0},${d.y0})`);
 
@@ -132,11 +140,13 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .attr("opacity", 0.9)
     .style("pointer-events", "none");
 
-  // Tooltip
+  // Tooltip - remove any existing tooltips first
+  d3.selectAll(".treemap-tooltip").remove();
+
   const tooltip = d3
     .select("body")
     .append("div")
-    .attr("class", "tooltip")
+    .attr("class", "treemap-tooltip")
     .style("position", "absolute")
     .style("visibility", "hidden")
     .style("background", "rgba(0, 0, 0, 0.9)")
