@@ -646,7 +646,7 @@ async function saveRound() {
       type,
       pricePerShare: type === "priced" ? price : undefined,
       moneyRaised: type === "priced" ? moneyRaised : undefined,
-      valuationCap: type === "safe" ? cap : undefined;
+      valuationCap: type === "safe" ? cap : undefined,
       investmentAmount: type === "safe" ? investment : undefined,
       authorizedShares: type === "equity-pool" ? poolAuthorized : undefined,
       date,
