@@ -205,15 +205,15 @@ async function saveData() {
 
 // Update statistics
 function updateStats() {
-  const totalAllocated = capTable.rounds.reduce(
+  const totalIssued = capTable.rounds.reduce(
     (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
     0
   );
-  const unallocated = capTable.authorizedShares - totalAllocated;
+  const remaining = capTable.authorizedShares - totalIssued;
   const totalHolders = capTable.rounds.reduce((sum, round) => sum + round.allocations.length, 0);
 
-  document.getElementById("stat-allocated").textContent = formatNumber(totalAllocated);
-  document.getElementById("stat-unallocated").textContent = formatNumber(unallocated);
+  document.getElementById("stat-allocated").textContent = formatNumber(totalIssued);
+  document.getElementById("stat-unallocated").textContent = formatNumber(remaining);
   document.getElementById("stat-rounds").textContent = capTable.rounds.length;
   document.getElementById("stat-holders").textContent = totalHolders;
 }
@@ -475,6 +475,7 @@ function toggleRoundTypeFields() {
   const moneyRaisedGroup = document.getElementById("money-raised-group");
   const capGroup = document.getElementById("valuation-cap-group");
   const investmentGroup = document.getElementById("investment-amount-group");
+  const poolAuthorizedGroup = document.getElementById("pool-authorized-group");
   const dilutionPreview = document.getElementById("dilution-preview");
 
   if (type === "safe") {
@@ -482,12 +483,14 @@ function toggleRoundTypeFields() {
     moneyRaisedGroup.style.display = "none";
     capGroup.style.display = "block";
     investmentGroup.style.display = "block";
+    poolAuthorizedGroup.style.display = "none";
     dilutionPreview.style.display = "none";
   } else if (type === "equity-pool") {
     priceGroup.style.display = "none";
     moneyRaisedGroup.style.display = "none";
     capGroup.style.display = "none";
     investmentGroup.style.display = "none";
+    poolAuthorizedGroup.style.display = "block";
     dilutionPreview.style.display = "none";
   } else {
     // Priced round
@@ -495,6 +498,7 @@ function toggleRoundTypeFields() {
     moneyRaisedGroup.style.display = "block";
     capGroup.style.display = "none";
     investmentGroup.style.display = "none";
+    poolAuthorizedGroup.style.display = "none";
     dilutionPreview.style.display = "block";
     updateDilutionPreview();
   }
@@ -562,6 +566,7 @@ function openRoundModal(roundId = null) {
     document.getElementById("round-money-raised").value = round.moneyRaised || "";
     document.getElementById("round-valuation-cap").value = round.valuationCap || "";
     document.getElementById("round-investment-amount").value = round.investmentAmount || "";
+    document.getElementById("round-pool-authorized").value = round.authorizedShares || "";
     document.getElementById("round-date").value = round.date;
     document.getElementById("round-color").value = round.color;
   } else {
@@ -572,6 +577,7 @@ function openRoundModal(roundId = null) {
     document.getElementById("round-money-raised").value = "";
     document.getElementById("round-valuation-cap").value = "";
     document.getElementById("round-investment-amount").value = "";
+    document.getElementById("round-pool-authorized").value = "";
     document.getElementById("round-date").value = new Date().toISOString().split("T")[0];
     document.getElementById("round-color").value = "#" + Math.floor(Math.random() * 16777215).toString(16);
   }
@@ -592,6 +598,7 @@ async function saveRound() {
   const moneyRaisedStr = document.getElementById("round-money-raised").value.trim();
   const capStr = document.getElementById("round-valuation-cap").value.trim();
   const investmentStr = document.getElementById("round-investment-amount").value.trim();
+  const poolAuthorizedStr = document.getElementById("round-pool-authorized").value.trim();
   const date = document.getElementById("round-date").value;
   const color = document.getElementById("round-color").value;
 
@@ -604,6 +611,7 @@ async function saveRound() {
   const moneyRaised = moneyRaisedStr ? parseFloat(moneyRaisedStr) : undefined;
   const cap = capStr ? parseFloat(capStr) : undefined;
   const investment = investmentStr ? parseFloat(investmentStr) : undefined;
+  const poolAuthorized = poolAuthorizedStr ? parseInt(poolAuthorizedStr) : undefined;
 
   // Check if this is a priced round and there are unconverted SAFEs
   let shouldConvertSAFEs = false;
@@ -626,6 +634,7 @@ async function saveRound() {
     round.moneyRaised = type === "priced" ? moneyRaised : undefined;
     round.valuationCap = type === "safe" ? cap : undefined;
     round.investmentAmount = type === "safe" ? investment : undefined;
+    round.authorizedShares = type === "equity-pool" ? poolAuthorized : undefined;
     round.date = date;
     round.color = color;
   } else {
@@ -637,8 +646,9 @@ async function saveRound() {
       type,
       pricePerShare: type === "priced" ? price : undefined,
       moneyRaised: type === "priced" ? moneyRaised : undefined,
-      valuationCap: type === "safe" ? cap : undefined,
+      valuationCap: type === "safe" ? cap : undefined;
       investmentAmount: type === "safe" ? investment : undefined,
+      authorizedShares: type === "equity-pool" ? poolAuthorized : undefined,
       date,
       color,
       allocations: [],

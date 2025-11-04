@@ -94,10 +94,43 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .join("g")
     .attr("transform", (d) => `translate(${d.x0},${d.y0})`);
 
-  // Add rectangles
+  // Add rectangles with gradient for 3D effect (WinDirStat style)
   leaf
     .append("rect")
-    .attr("fill", (d) => d.data.roundColor || "#6b7280")
+    .attr("fill", (d) => {
+      const baseColor = d.data.roundColor || "#6b7280";
+      // Create a unique gradient ID for each node
+      const gradientId = `gradient-${d.data.name.replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Parse base color to create lighter/darker variants
+      const color = d3.color(baseColor);
+      const lighter = d3.color(baseColor).brighter(0.3);
+      const darker = d3.color(baseColor).darker(0.3);
+
+      // Create linear gradient
+      const defs = svg.select('defs').empty() ? svg.insert('defs', ':first-child') : svg.select('defs');
+
+      const gradient = defs.append('linearGradient')
+        .attr('id', gradientId)
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '100%')
+        .attr('y2', '100%');
+
+      gradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', lighter);
+
+      gradient.append('stop')
+        .attr('offset', '50%')
+        .attr('stop-color', baseColor);
+
+      gradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', darker);
+
+      return `url(#${gradientId})`;
+    })
     .attr("fill-opacity", (d) => {
       // Rounds are more opaque, allocations slightly transparent
       return d.depth === 1 ? 0.9 : 0.7;
@@ -260,13 +293,6 @@ function capTableToTree(capTable, mode) {
     return 0;
   };
 
-  // Calculate unallocated shares first
-  const totalAllocated = capTable.rounds.reduce(
-    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
-    0
-  );
-  const unallocated = capTable.authorizedShares - totalAllocated;
-
   const children = capTable.rounds.map((round) => {
     const roundChildren = round.allocations.map((allocation) => ({
       name: allocation.holderName,
@@ -282,18 +308,24 @@ function capTableToTree(capTable, mode) {
       notes: allocation.notes,
     }));
 
-    // Add unallocated shares to equity pool round
-    if (round.type === "equity-pool" && unallocated > 0) {
-      roundChildren.push({
-        name: "Unallocated",
-        value: getValue(unallocated, round),
-        round: round.name,
-        roundColor: round.color,
-        type: "unallocated",
-        holderName: "Unallocated",
-        shares: unallocated,
-        isUnallocated: true,
-      });
+    // For equity pool rounds, calculate unallocated shares within the pool
+    if (round.type === "equity-pool") {
+      const poolAllocated = round.allocations.reduce((sum, a) => sum + a.shares, 0);
+      const poolAuthorized = round.authorizedShares || 0;
+      const poolUnallocated = poolAuthorized - poolAllocated;
+
+      if (poolUnallocated > 0) {
+        roundChildren.push({
+          name: "Unallocated",
+          value: getValue(poolUnallocated, round),
+          round: round.name,
+          roundColor: round.color,
+          type: "unallocated",
+          holderName: "Unallocated",
+          shares: poolUnallocated,
+          isUnallocated: true,
+        });
+      }
     }
 
     return {

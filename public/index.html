@@ -472,11 +472,11 @@
           <h2>Statistics</h2>
           <div class="stats-grid">
             <div class="stat-card">
-              <div class="stat-label">Total Allocated</div>
+              <div class="stat-label">Total Issued</div>
               <div class="stat-value" id="stat-allocated">-</div>
             </div>
             <div class="stat-card">
-              <div class="stat-label">Unallocated</div>
+              <div class="stat-label">Remaining (of 15M cap)</div>
               <div class="stat-value" id="stat-unallocated">-</div>
             </div>
             <div class="stat-card">
@@ -567,6 +567,10 @@
         <label>Investment Amount</label>
         <input type="number" step="1" id="round-investment-amount" placeholder="400000">
       </div>
+    <div class="form-group" id="pool-authorized-group" style="display: none;">
+      <label>Pool Authorized Shares</label>
+      <input type="number" step="1" id="round-pool-authorized" placeholder="1500000">
+    </div>
       <div class="form-group">
         <label>Date</label>
         <input type="date" id="round-date">
