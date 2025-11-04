@@ -1,4 +1,6 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+import { exportToCSV, parseCSV, downloadCSVTemplate } from "./csv-handler.js";
+import { renderTreemap as renderTreemapModule } from "./treemap-renderer.js";
 
 // State
 let capTable = null;
@@ -57,11 +59,47 @@ async function init() {
   document.getElementById("allocation-cancel").addEventListener("click", closeAllocationModal);
   document.getElementById("allocation-save").addEventListener("click", saveAllocation);
 
+  // CSV import/export
+  document.getElementById("export-csv").addEventListener("click", () => exportToCSV(capTable));
+  document.getElementById("import-csv").addEventListener("click", () => {
+    document.getElementById("csv-file-input").click();
+  });
+  document.getElementById("csv-file-input").addEventListener("change", handleCSVImport);
+
   // Window resize
   window.addEventListener("resize", () => renderTreemap());
 
   // Render rounds list
   renderRoundsList();
+}
+
+// CSV Import Handler
+function handleCSVImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const rounds = parseCSV(e.target.result);
+
+      if (confirm(`Import ${rounds.length} rounds? This will replace existing rounds.`)) {
+        capTable.rounds = rounds;
+        saveData();
+        renderRoundsList();
+        updateStats();
+        updateLegend();
+        renderTreemap();
+        alert('Import successful!');
+      }
+    } catch (error) {
+      alert('Error importing CSV: ' + error.message);
+    }
+  };
+  reader.readAsText(file);
+
+  // Reset input
+  event.target.value = '';
 }
 
 // View mode
@@ -137,101 +175,7 @@ function updateLegend() {
 
 // Render treemap
 function renderTreemap() {
-  const container = document.getElementById("treemap-container");
-  const width = container.clientWidth;
-  const height = container.clientHeight;
-
-  // Clear existing
-  d3.select("#treemap").selectAll("*").remove();
-
-  // Convert data to tree
-  const treeData = capTableToTree(capTable, currentViewMode);
-
-  // Create hierarchy
-  const root = d3.hierarchy(treeData)
-    .sum(d => d.value)
-    .sort((a, b) => b.value - a.value);
-
-  // Create treemap layout on the full tree first
-  const treemap = d3.treemap()
-    .size([width, height])
-    .padding(2)
-    .round(true);
-
-  treemap(root);
-
-  // Determine which node to render (zoom level)
-  const nodeToRender = currentZoomNode || root;
-
-  // If we're zoomed in, rescale the children to fill the viewport
-  if (currentZoomNode && currentZoomNode.children) {
-    const x0 = currentZoomNode.x0;
-    const y0 = currentZoomNode.y0;
-    const x1 = currentZoomNode.x1;
-    const y1 = currentZoomNode.y1;
-
-    const scaleX = width / (x1 - x0);
-    const scaleY = height / (y1 - y0);
-
-    currentZoomNode.children.forEach(child => {
-      child.x0 = (child.x0 - x0) * scaleX;
-      child.y0 = (child.y0 - y0) * scaleY;
-      child.x1 = (child.x1 - x0) * scaleX;
-      child.y1 = (child.y1 - y0) * scaleY;
-    });
-  }
-
-  // Create SVG
-  const svg = d3.select("#treemap")
-    .attr("width", width)
-    .attr("height", height);
-
-  // Show children of the current zoom node
-  const nodesToShow = nodeToRender.children || [nodeToRender];
-
-  // Create cells
-  const cell = svg.selectAll("g")
-    .data(nodesToShow)
-    .join("g")
-    .attr("transform", d => `translate(${d.x0},${d.y0})`);
-
-  // Rectangles
-  cell.append("rect")
-    .attr("class", "node")
-    .attr("width", d => d.x1 - d.x0)
-    .attr("height", d => d.y1 - d.y0)
-    .attr("fill", d => d.data.roundColor || "#6b7280")
-    .on("click", (event, d) => zoomToNode(d))
-    .on("mouseenter", (event, d) => showTooltip(event, d))
-    .on("mousemove", (event) => moveTooltip(event))
-    .on("mouseleave", hideTooltip);
-
-  // Labels
-  cell.append("text")
-    .attr("class", "node-label")
-    .attr("x", 4)
-    .attr("y", 16)
-    .text(d => {
-      const width = d.x1 - d.x0;
-      if (width < 60) return "";
-      return d.data.name;
-    });
-
-  // Values
-  cell.append("text")
-    .attr("class", "node-value")
-    .attr("x", 4)
-    .attr("y", 30)
-    .text(d => {
-      const width = d.x1 - d.x0;
-      if (width < 80) return "";
-      if (currentViewMode === "shares") {
-        return formatNumber(d.value) + " shares";
-      } else {
-        return formatCurrency(d.value);
-      }
-    });
-
+  renderTreemapModule(capTable, currentViewMode, currentZoomNode, zoomToNode);
   updateBreadcrumb();
 }
 
@@ -438,6 +382,8 @@ function renderRoundsList() {
     let roundDetails = `${formatNumber(totalShares)} shares • ${round.allocations.length} allocations`;
     if (round.type === "safe" && round.valuationCap) {
       roundDetails += ` • $${formatNumber(round.valuationCap)} cap`;
+    } else if (round.type === "equity-pool") {
+      roundDetails += ` • Equity Pool`;
     } else if (round.pricePerShare) {
       roundDetails += ` • $${round.pricePerShare}/share`;
     }
@@ -465,6 +411,9 @@ function toggleRoundTypeFields() {
   if (type === "safe") {
     priceGroup.style.display = "none";
     capGroup.style.display = "block";
+  } else if (type === "equity-pool") {
+    priceGroup.style.display = "none";
+    capGroup.style.display = "none";
   } else {
     priceGroup.style.display = "block";
     capGroup.style.display = "none";

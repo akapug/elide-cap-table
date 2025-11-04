@@ -492,6 +492,17 @@
 
         <div class="sidebar-section">
           <div class="section-header">
+            <h2>Data Management</h2>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button id="export-csv" class="secondary">Export CSV</button>
+            <button id="import-csv" class="secondary">Import CSV</button>
+            <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="section-header">
             <h2>Rounds</h2>
             <button id="add-round">+ Add Round</button>
           </div>
@@ -522,6 +533,7 @@
       <select id="round-type">
         <option value="priced">Priced Round</option>
         <option value="safe">SAFE</option>
+        <option value="equity-pool">Equity Pool</option>
       </select>
     </div>
     <div class="form-group" id="price-group">
@@ -601,7 +613,7 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=5"></script>
+  <script type="module" src="/app.js?v=6"></script>
 </body>
 </html>
 
