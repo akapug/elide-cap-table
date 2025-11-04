@@ -41,6 +41,16 @@ async function init() {
   document.getElementById("round-modal-close").addEventListener("click", closeRoundModal);
   document.getElementById("round-cancel").addEventListener("click", closeRoundModal);
   document.getElementById("round-save").addEventListener("click", saveRound);
+  document.getElementById("round-type").addEventListener("change", toggleRoundTypeFields);
+
+  // Allocations list modal
+  document.getElementById("allocations-list-close").addEventListener("click", closeAllocationsListModal);
+  document.getElementById("allocations-list-done").addEventListener("click", closeAllocationsListModal);
+  document.getElementById("add-allocation-btn").addEventListener("click", () => {
+    const roundId = editingRoundId;
+    closeAllocationsListModal();
+    openAllocationModal(roundId);
+  });
 
   // Allocation modal
   document.getElementById("allocation-modal-close").addEventListener("click", closeAllocationModal);
@@ -335,12 +345,14 @@ function createSampleCapTable() {
       },
       {
         id: "safe",
-        name: "SAFE Financings",
-        pricePerShare: 0.035,
+        name: "Pre-Seed SAFE",
+        type: "safe",
+        valuationCap: 10000000,
         date: "2021-06-01",
         color: "#10b981",
         allocations: [
-          { id: "safe-1", holderName: "SAFE Investors", shares: 400101, type: "preferred" },
+          { id: "safe-1", holderName: "Angel Investor 1", shares: 200050, type: "preferred" },
+          { id: "safe-2", holderName: "Angel Investor 2", shares: 200051, type: "preferred" },
         ],
       },
       {
@@ -422,13 +434,18 @@ function renderRoundsList() {
     const totalShares = round.allocations.reduce((sum, a) => sum + a.shares, 0);
     const item = document.createElement("div");
     item.className = "list-item";
+
+    let roundDetails = `${formatNumber(totalShares)} shares • ${round.allocations.length} allocations`;
+    if (round.type === "safe" && round.valuationCap) {
+      roundDetails += ` • $${formatNumber(round.valuationCap)} cap`;
+    } else if (round.pricePerShare) {
+      roundDetails += ` • $${round.pricePerShare}/share`;
+    }
+
     item.innerHTML = `
       <div class="list-item-info">
         <div class="list-item-title" style="color: ${round.color}">${round.name}</div>
-        <div class="list-item-details">
-          ${formatNumber(totalShares)} shares • ${round.allocations.length} allocations
-          ${round.pricePerShare ? ` • $${round.pricePerShare}/share` : ""}
-        </div>
+        <div class="list-item-details">${roundDetails}</div>
       </div>
       <div class="list-item-actions">
         <button class="secondary" onclick="editRound('${round.id}')">Edit</button>
@@ -440,6 +457,20 @@ function renderRoundsList() {
   });
 }
 
+function toggleRoundTypeFields() {
+  const type = document.getElementById("round-type").value;
+  const priceGroup = document.getElementById("price-group");
+  const capGroup = document.getElementById("valuation-cap-group");
+
+  if (type === "safe") {
+    priceGroup.style.display = "none";
+    capGroup.style.display = "block";
+  } else {
+    priceGroup.style.display = "block";
+    capGroup.style.display = "none";
+  }
+}
+
 function openRoundModal(roundId = null) {
   editingRound = roundId;
   const modal = document.getElementById("round-modal");
@@ -449,17 +480,22 @@ function openRoundModal(roundId = null) {
     const round = capTable.rounds.find((r) => r.id === roundId);
     title.textContent = "Edit Round";
     document.getElementById("round-name").value = round.name;
+    document.getElementById("round-type").value = round.type || "priced";
     document.getElementById("round-price").value = round.pricePerShare || "";
+    document.getElementById("round-valuation-cap").value = round.valuationCap || "";
     document.getElementById("round-date").value = round.date;
     document.getElementById("round-color").value = round.color;
   } else {
     title.textContent = "Add Round";
     document.getElementById("round-name").value = "";
+    document.getElementById("round-type").value = "priced";
     document.getElementById("round-price").value = "";
+    document.getElementById("round-valuation-cap").value = "";
     document.getElementById("round-date").value = new Date().toISOString().split("T")[0];
     document.getElementById("round-color").value = "#" + Math.floor(Math.random() * 16777215).toString(16);
   }
 
+  toggleRoundTypeFields();
   modal.classList.add("visible");
 }
 
@@ -470,7 +506,9 @@ function closeRoundModal() {
 
 function saveRound() {
   const name = document.getElementById("round-name").value.trim();
+  const type = document.getElementById("round-type").value;
   const priceStr = document.getElementById("round-price").value.trim();
+  const capStr = document.getElementById("round-valuation-cap").value.trim();
   const date = document.getElementById("round-date").value;
   const color = document.getElementById("round-color").value;
 
@@ -480,12 +518,15 @@ function saveRound() {
   }
 
   const price = priceStr ? parseFloat(priceStr) : undefined;
+  const cap = capStr ? parseFloat(capStr) : undefined;
 
   if (editingRound) {
     // Edit existing
     const round = capTable.rounds.find((r) => r.id === editingRound);
     round.name = name;
-    round.pricePerShare = price;
+    round.type = type;
+    round.pricePerShare = type === "priced" ? price : undefined;
+    round.valuationCap = type === "safe" ? cap : undefined;
     round.date = date;
     round.color = color;
   } else {
@@ -494,7 +535,9 @@ function saveRound() {
     capTable.rounds.push({
       id,
       name,
-      pricePerShare: price,
+      type,
+      pricePerShare: type === "priced" ? price : undefined,
+      valuationCap: type === "safe" ? cap : undefined,
       date,
       color,
       allocations: [],
@@ -526,13 +569,48 @@ function manageAllocations(roundId) {
   editingRoundId = roundId;
   const round = capTable.rounds.find((r) => r.id === roundId);
 
-  // Show modal with list of allocations
-  const modal = document.getElementById("allocation-modal");
-  const title = document.getElementById("allocation-modal-title");
+  const modal = document.getElementById("allocations-list-modal");
+  const title = document.getElementById("allocations-list-title");
+  const container = document.getElementById("allocations-list-container");
+
   title.textContent = `Manage Allocations - ${round.name}`;
 
-  // For now, just open add allocation modal
-  openAllocationModal(roundId);
+  // Render allocations list
+  container.innerHTML = "";
+
+  if (round.allocations.length === 0) {
+    container.innerHTML = "<p style='padding: 20px; text-align: center; color: #6b7280;'>No allocations yet. Click '+ Add Allocation' to get started.</p>";
+  } else {
+    round.allocations.forEach((allocation) => {
+      const item = document.createElement("div");
+      item.className = "list-item";
+
+      let details = `${formatNumber(allocation.shares)} shares • ${allocation.type}`;
+      if (allocation.vestingSchedule) {
+        details += ` • ${allocation.vestingSchedule}`;
+      }
+
+      item.innerHTML = `
+        <div class="list-item-info">
+          <div class="list-item-title">${allocation.holderName}</div>
+          <div class="list-item-details">${details}</div>
+          ${allocation.notes ? `<div class="list-item-details" style="font-style: italic;">${allocation.notes}</div>` : ""}
+        </div>
+        <div class="list-item-actions">
+          <button class="secondary" onclick="editAllocation('${roundId}', '${allocation.id}')">Edit</button>
+          <button class="danger" onclick="deleteAllocation('${roundId}', '${allocation.id}')">Delete</button>
+        </div>
+      `;
+      container.appendChild(item);
+    });
+  }
+
+  modal.classList.add("visible");
+}
+
+function closeAllocationsListModal() {
+  document.getElementById("allocations-list-modal").classList.remove("visible");
+  editingRoundId = null;
 }
 
 function openAllocationModal(roundId, allocationId = null) {
@@ -566,7 +644,7 @@ function openAllocationModal(roundId, allocationId = null) {
 function closeAllocationModal() {
   document.getElementById("allocation-modal").classList.remove("visible");
   editingAllocation = null;
-  editingRoundId = null;
+  // Don't clear editingRoundId - we might be returning to allocations list
 }
 
 function saveAllocation() {
@@ -615,6 +693,15 @@ function saveAllocation() {
   updateStats();
   renderTreemap();
   closeAllocationModal();
+
+  // Reopen allocations list to show updated list
+  if (editingRoundId) {
+    manageAllocations(editingRoundId);
+  }
+}
+
+function editAllocation(roundId, allocationId) {
+  openAllocationModal(roundId, allocationId);
 }
 
 function deleteAllocation(roundId, allocationId) {
@@ -627,10 +714,16 @@ function deleteAllocation(roundId, allocationId) {
   renderRoundsList();
   updateStats();
   renderTreemap();
+
+  // Refresh allocations list if it's open
+  if (document.getElementById("allocations-list-modal").classList.contains("visible")) {
+    manageAllocations(roundId);
+  }
 }
 
 window.manageAllocations = manageAllocations;
 window.openAllocationModal = openAllocationModal;
+window.editAllocation = editAllocation;
 window.deleteAllocation = deleteAllocation;
 
 // Start

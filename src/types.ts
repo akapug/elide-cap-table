@@ -16,7 +16,9 @@ export interface CapTable {
 export interface Round {
   id: string;
   name: string; // "Common Stock", "Seed", "Series A", etc.
-  pricePerShare?: number; // undefined for Common Stock
+  type?: "priced" | "safe"; // Round type (defaults to priced)
+  pricePerShare?: number; // For priced rounds
+  valuationCap?: number; // For SAFE rounds
   date: string; // ISO date string
   allocations: Allocation[];
   color: string; // Hex color for this round

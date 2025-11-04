@@ -518,9 +518,20 @@
         <input type="text" id="round-name" placeholder="Series A">
       </div>
       <div class="form-group">
-        <label>Price Per Share (optional)</label>
+      <label>Round Type</label>
+      <select id="round-type">
+        <option value="priced">Priced Round</option>
+        <option value="safe">SAFE</option>
+      </select>
+    </div>
+    <div class="form-group" id="price-group">
+        <label>Price Per Share</label>
         <input type="number" step="0.01" id="round-price" placeholder="2.00">
       </div>
+    <div class="form-group" id="valuation-cap-group" style="display: none;">
+      <label>Valuation Cap</label>
+      <input type="number" step="1" id="round-valuation-cap" placeholder="10000000">
+    </div>
       <div class="form-group">
         <label>Date</label>
         <input type="date" id="round-date">
@@ -532,6 +543,21 @@
       <div class="modal-actions">
         <button class="secondary" id="round-cancel">Cancel</button>
         <button id="round-save">Save Round</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Allocations List Modal -->
+  <div id="allocations-list-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="allocations-list-title">Manage Allocations</h2>
+        <button class="modal-close" id="allocations-list-close">&times;</button>
+      </div>
+      <div id="allocations-list-container"></div>
+      <div class="modal-actions">
+        <button id="add-allocation-btn">+ Add Allocation</button>
+        <button class="secondary" id="allocations-list-done">Done</button>
       </div>
     </div>
   </div>
@@ -575,7 +601,7 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=4"></script>
+  <script type="module" src="/app.js?v=5"></script>
 </body>
 </html>
 
