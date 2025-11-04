@@ -40,41 +40,68 @@ export function calculateValuation(pricePerShare, sharesBeforeRound, moneyRaised
 
 /**
  * Convert SAFE notes to shares when a priced round is added
- * @param {Array} safeRounds - Array of SAFE rounds
- * @param {number} pricedRoundValuation - Post-money valuation of the priced round
+ * @param {Object} capTable - The cap table with all rounds
+ * @param {number} postMoneyValuation - Post-money valuation of the priced round
  * @param {number} pricePerShare - Price per share in the priced round
- * @returns {Array} Converted allocations with actual share counts
+ * @returns {Object} { conversions: Array, updatedRounds: Array }
  */
-export function convertSAFEs(safeRounds, pricedRoundValuation, pricePerShare) {
+export function convertSAFEs(capTable, postMoneyValuation, pricePerShare) {
   const conversions = [];
-  
-  safeRounds.forEach(round => {
-    if (round.type !== 'safe' || !round.valuationCap) return;
-    
+  const updatedRounds = [];
+
+  capTable.rounds.forEach(round => {
+    if (round.type !== 'safe' || !round.valuationCap) {
+      updatedRounds.push(round);
+      return;
+    }
+
     // SAFE conversion formula:
-    // Conversion price = min(valuation cap / post-money valuation, discount) * price per share
-    // For simplicity, we'll use: conversion price = (valuation cap / post-money valuation) * price per share
-    const conversionDiscount = Math.min(1, round.valuationCap / pricedRoundValuation);
+    // Conversion price = (valuation cap / post-money valuation) * price per share
+    // But it can't be higher than the price per share (no discount if cap > post-money)
+    const conversionDiscount = Math.min(1, round.valuationCap / postMoneyValuation);
     const conversionPrice = conversionDiscount * pricePerShare;
-    
-    round.allocations.forEach(alloc => {
-      // Assume the SAFE investment amount is stored in a field, or calculate from shares
-      // For now, we'll back-calculate the investment from current shares and valuation cap
-      const impliedInvestment = alloc.shares * (round.valuationCap / 12893506); // TODO: use actual authorized shares
-      const convertedShares = Math.round(impliedInvestment / conversionPrice);
-      
+
+    const updatedAllocations = round.allocations.map(alloc => {
+      // Use investment amount if available, otherwise estimate from shares and cap
+      let investmentAmount = alloc.investmentAmount;
+      if (!investmentAmount) {
+        // Back-calculate from shares: shares * (cap / total shares)
+        const impliedPricePerShare = round.valuationCap / capTable.authorizedShares;
+        investmentAmount = alloc.shares * impliedPricePerShare;
+      }
+
+      const convertedShares = Math.round(investmentAmount / conversionPrice);
+
       conversions.push({
         holderName: alloc.holderName,
         originalShares: alloc.shares,
         convertedShares: convertedShares,
+        investmentAmount: investmentAmount,
         conversionPrice: conversionPrice,
         discount: (1 - conversionDiscount) * 100,
         roundName: round.name
       });
+
+      // Return updated allocation with converted shares
+      return {
+        ...alloc,
+        shares: convertedShares,
+        convertedFrom: 'SAFE',
+        originalShares: alloc.shares,
+        conversionPrice: conversionPrice
+      };
+    });
+
+    // Mark round as converted
+    updatedRounds.push({
+      ...round,
+      allocations: updatedAllocations,
+      converted: true,
+      conversionPrice: conversionPrice
     });
   });
-  
-  return conversions;
+
+  return { conversions, updatedRounds };
 }
 
 /**

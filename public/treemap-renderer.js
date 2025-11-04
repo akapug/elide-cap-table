@@ -123,17 +123,17 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .text((d) => {
       const width = d.x1 - d.x0;
       const height = d.y1 - d.y0;
-      
+
       // Always show round names if width > 40
       if (d.depth === 1 && width > 40) {
         return d.data.name;
       }
-      
+
       // Show allocation names if there's enough space
       if (d.depth === 2 && width > 60 && height > 20) {
         return d.data.name;
       }
-      
+
       return "";
     })
     .attr("fill", "#fff")
@@ -141,7 +141,30 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .attr("font-size", (d) => (d.depth === 1 ? "12px" : "10px"))
     .style("pointer-events", "none");
 
-  // Add share count below name for allocations
+  // Calculate total shares for ownership % from the hierarchy
+  const totalShares = hierarchy.value;
+
+  // Add ownership % for rounds (second line)
+  leaf
+    .filter((d) => d.depth === 1)
+    .append("text")
+    .attr("x", 4)
+    .attr("y", 28)
+    .text((d) => {
+      const width = d.x1 - d.x0;
+      const height = d.y1 - d.y0;
+      if (width > 60 && height > 35 && viewMode === "shares") {
+        const ownership = (d.value / totalShares) * 100;
+        return ownership.toFixed(2) + "% ownership";
+      }
+      return "";
+    })
+    .attr("fill", "#fff")
+    .attr("font-size", "10px")
+    .attr("opacity", 0.9)
+    .style("pointer-events", "none");
+
+  // Add share count and ownership % below name for allocations
   leaf
     .filter((d) => d.depth === 2)
     .append("text")
@@ -158,6 +181,27 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .attr("fill", "#fff")
     .attr("font-size", "9px")
     .attr("opacity", 0.9)
+    .style("pointer-events", "none");
+
+  // Add ownership % for allocations (third line)
+  leaf
+    .filter((d) => d.depth === 2)
+    .append("text")
+    .attr("x", 4)
+    .attr("y", 38)
+    .text((d) => {
+      const width = d.x1 - d.x0;
+      const height = d.y1 - d.y0;
+      if (width > 60 && height > 45 && viewMode === "shares") {
+        const ownership = (d.value / totalShares) * 100;
+        return ownership.toFixed(2) + "%";
+      }
+      return "";
+    })
+    .attr("fill", "#fff")
+    .attr("font-size", "9px")
+    .attr("opacity", 0.8)
+    .attr("font-weight", "bold")
     .style("pointer-events", "none");
 
   // Tooltip - remove any existing tooltips first

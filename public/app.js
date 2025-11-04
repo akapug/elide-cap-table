@@ -2,7 +2,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { exportToCSV, parseCSV, downloadCSVTemplate } from "./csv-handler.js";
 import { renderTreemap as renderTreemapModule } from "./treemap-renderer.js";
 import * as ScenarioManager from "./scenario-manager.js";
-import { calculateDilution, formatOwnership, formatCurrency } from "./dilution-calculator.js";
+import { calculateDilution, formatOwnership, formatCurrency, convertSAFEs } from "./dilution-calculator.js";
 
 // State
 let capTable = null;
@@ -605,6 +605,18 @@ async function saveRound() {
   const cap = capStr ? parseFloat(capStr) : undefined;
   const investment = investmentStr ? parseFloat(investmentStr) : undefined;
 
+  // Check if this is a priced round and there are unconverted SAFEs
+  let shouldConvertSAFEs = false;
+  if (type === "priced" && price && moneyRaised && !editingRound) {
+    const hasSAFEs = capTable.rounds.some(r => r.type === "safe" && !r.converted);
+    if (hasSAFEs) {
+      shouldConvertSAFEs = confirm(
+        "This is your first priced round! Would you like to automatically convert SAFE notes to equity shares?\n\n" +
+        "This will calculate the conversion price based on the valuation cap and update SAFE allocations."
+      );
+    }
+  }
+
   if (editingRound) {
     // Edit existing
     const round = capTable.rounds.find((r) => r.id === editingRound);
@@ -631,6 +643,34 @@ async function saveRound() {
       color,
       allocations: [],
     });
+  }
+
+  // Convert SAFEs if user confirmed
+  if (shouldConvertSAFEs) {
+    const totalShares = capTable.rounds.reduce((sum, r) =>
+      sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0
+    );
+    const preMoney = price * totalShares;
+    const postMoney = preMoney + moneyRaised;
+
+    const { conversions, updatedRounds } = convertSAFEs(capTable, postMoney, price);
+    capTable.rounds = updatedRounds;
+
+    // Show conversion summary
+    if (conversions.length > 0) {
+      let summary = "SAFE Conversion Summary:\n\n";
+      conversions.forEach(c => {
+        summary += `${c.holderName} (${c.roundName}):\n`;
+        summary += `  Investment: ${formatCurrency(c.investmentAmount)}\n`;
+        summary += `  Conversion Price: ${formatCurrency(c.conversionPrice)}/share\n`;
+        summary += `  Shares: ${c.originalShares.toLocaleString()} → ${c.convertedShares.toLocaleString()}\n`;
+        if (c.discount > 0) {
+          summary += `  Discount: ${c.discount.toFixed(1)}%\n`;
+        }
+        summary += `\n`;
+      });
+      alert(summary);
+    }
   }
 
   await saveData();
