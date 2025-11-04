@@ -399,10 +399,10 @@ function capTableToTree(capTable, mode) {
       }
     }
 
-    // For SAFE rounds with targetAmount, show unallocated investment capacity
-    if (round.type === "safe" && round.targetAmount) {
+    // For SAFE rounds with investmentAmount, show unallocated investment capacity
+    if (round.type === "safe" && round.investmentAmount) {
       const totalInvested = round.allocations.reduce((sum, a) => sum + (a.investmentAmount || 0), 0);
-      const remainingCapacity = round.targetAmount - totalInvested;
+      const remainingCapacity = round.investmentAmount - totalInvested;
 
       if (remainingCapacity > 0 && round.valuationCap) {
         // Calculate shares for unallocated portion using same formula as allocations
@@ -426,10 +426,11 @@ function capTableToTree(capTable, mode) {
       }
     }
 
-    // For priced rounds with targetShares, show unallocated shares
-    if (round.type === "priced" && round.targetShares) {
+    // For priced rounds with moneyRaised, show unallocated shares
+    if (round.type === "priced" && round.moneyRaised && round.pricePerShare) {
+      const targetShares = Math.round(round.moneyRaised / round.pricePerShare);
       const allocatedShares = round.allocations.reduce((sum, a) => sum + a.shares, 0);
-      const unallocatedShares = round.targetShares - allocatedShares;
+      const unallocatedShares = targetShares - allocatedShares;
 
       if (unallocatedShares > 0) {
         roundChildren.push({

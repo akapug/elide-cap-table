@@ -560,9 +560,9 @@ function renderRoundsList() {
       if (round.valuationCap) {
         roundDetails += ` • $${formatNumber(round.valuationCap)} cap`;
       }
-      if (round.targetAmount) {
+      if (round.investmentAmount) {
         const totalInvested = round.allocations.reduce((sum, a) => sum + (a.investmentAmount || 0), 0);
-        roundDetails += ` • $${formatNumber(totalInvested)}/$${formatNumber(round.targetAmount)} raised`;
+        roundDetails += ` • $${formatNumber(totalInvested)}/$${formatNumber(round.investmentAmount)} raised`;
       }
     } else if (round.type === "equity-pool") {
       roundDetails += ` • Equity Pool`;
@@ -573,8 +573,9 @@ function renderRoundsList() {
       if (round.pricePerShare) {
         roundDetails += ` • $${round.pricePerShare}/share`;
       }
-      if (round.targetShares) {
-        roundDetails += ` • ${formatNumber(totalShares)}/${formatNumber(round.targetShares)} sold`;
+      if (round.moneyRaised) {
+        const targetShares = Math.round(round.moneyRaised / round.pricePerShare);
+        roundDetails += ` • ${formatNumber(totalShares)}/${formatNumber(targetShares)} sold`;
       }
     }
 
@@ -597,39 +598,31 @@ function toggleRoundTypeFields() {
   const type = document.getElementById("round-type").value;
   const priceGroup = document.getElementById("price-group");
   const moneyRaisedGroup = document.getElementById("money-raised-group");
-  const targetSharesGroup = document.getElementById("target-shares-group");
   const capGroup = document.getElementById("valuation-cap-group");
   const investmentGroup = document.getElementById("investment-amount-group");
-  const targetAmountGroup = document.getElementById("target-amount-group");
   const poolAuthorizedGroup = document.getElementById("pool-authorized-group");
   const dilutionPreview = document.getElementById("dilution-preview");
 
   if (type === "safe") {
     priceGroup.style.display = "none";
     moneyRaisedGroup.style.display = "none";
-    targetSharesGroup.style.display = "none";
     capGroup.style.display = "block";
     investmentGroup.style.display = "block";
-    targetAmountGroup.style.display = "block";
     poolAuthorizedGroup.style.display = "none";
     dilutionPreview.style.display = "none";
   } else if (type === "equity-pool") {
     priceGroup.style.display = "none";
     moneyRaisedGroup.style.display = "none";
-    targetSharesGroup.style.display = "none";
     capGroup.style.display = "none";
     investmentGroup.style.display = "none";
-    targetAmountGroup.style.display = "none";
     poolAuthorizedGroup.style.display = "block";
     dilutionPreview.style.display = "none";
   } else {
     // Priced round
     priceGroup.style.display = "block";
     moneyRaisedGroup.style.display = "block";
-    targetSharesGroup.style.display = "block";
     capGroup.style.display = "none";
     investmentGroup.style.display = "none";
-    targetAmountGroup.style.display = "none";
     poolAuthorizedGroup.style.display = "none";
     dilutionPreview.style.display = "block";
     updateDilutionPreview();
@@ -696,10 +689,8 @@ function openRoundModal(roundId = null) {
     document.getElementById("round-type").value = round.type || "priced";
     document.getElementById("round-price").value = round.pricePerShare || "";
     document.getElementById("round-money-raised").value = round.moneyRaised || "";
-    document.getElementById("round-target-shares").value = round.targetShares || "";
     document.getElementById("round-valuation-cap").value = round.valuationCap || "";
     document.getElementById("round-investment-amount").value = round.investmentAmount || "";
-    document.getElementById("round-target-amount").value = round.targetAmount || "";
     document.getElementById("round-pool-authorized").value = round.authorizedShares || "";
     document.getElementById("round-date").value = round.date;
     document.getElementById("round-color").value = round.color;
@@ -709,10 +700,8 @@ function openRoundModal(roundId = null) {
     document.getElementById("round-type").value = "priced";
     document.getElementById("round-price").value = "";
     document.getElementById("round-money-raised").value = "";
-    document.getElementById("round-target-shares").value = "";
     document.getElementById("round-valuation-cap").value = "";
     document.getElementById("round-investment-amount").value = "";
-    document.getElementById("round-target-amount").value = "";
     document.getElementById("round-pool-authorized").value = "";
     document.getElementById("round-date").value = new Date().toISOString().split("T")[0];
     document.getElementById("round-color").value = "#" + Math.floor(Math.random() * 16777215).toString(16);
@@ -735,10 +724,8 @@ async function saveRound() {
   const type = document.getElementById("round-type").value;
   const priceStr = document.getElementById("round-price").value.trim();
   const moneyRaisedStr = document.getElementById("round-money-raised").value.trim();
-  const targetSharesStr = document.getElementById("round-target-shares").value.trim();
   const capStr = document.getElementById("round-valuation-cap").value.trim();
   const investmentStr = document.getElementById("round-investment-amount").value.trim();
-  const targetAmountStr = document.getElementById("round-target-amount").value.trim();
   const poolAuthorizedStr = document.getElementById("round-pool-authorized").value.trim();
   const date = document.getElementById("round-date").value;
   const color = document.getElementById("round-color").value;
@@ -755,16 +742,18 @@ async function saveRound() {
     return;
   }
 
+  // Parse values first
+  const price = priceStr ? parseFloat(priceStr) : undefined;
+  const moneyRaised = moneyRaisedStr ? parseFloat(moneyRaisedStr) : undefined;
+  const cap = capStr ? parseFloat(capStr) : undefined;
+  const investment = investmentStr ? parseFloat(investmentStr) : undefined;
+  const poolAuthorized = poolAuthorizedStr ? parseInt(poolAuthorizedStr) : undefined;
+
   // Validate type-specific required fields
   if (type === "priced") {
     if (!price || price <= 0) {
       alert("❌ Price per share must be greater than 0 for priced rounds");
       document.getElementById("round-price").focus();
-      return;
-    }
-    if (!moneyRaised || moneyRaised <= 0) {
-      alert("❌ Money raised must be greater than 0 for priced rounds");
-      document.getElementById("round-money-raised").focus();
       return;
     }
   } else if (type === "safe") {
@@ -773,21 +762,13 @@ async function saveRound() {
       document.getElementById("round-valuation-cap").focus();
       return;
     }
-  } else if (type === "pool") {
+  } else if (type === "equity-pool") {
     if (!poolAuthorized || poolAuthorized <= 0) {
       alert("❌ Pool authorized shares must be greater than 0");
       document.getElementById("round-pool-authorized").focus();
       return;
     }
   }
-
-  const price = priceStr ? parseFloat(priceStr) : undefined;
-  const moneyRaised = moneyRaisedStr ? parseFloat(moneyRaisedStr) : undefined;
-  const targetShares = targetSharesStr ? parseInt(targetSharesStr) : undefined;
-  const cap = capStr ? parseFloat(capStr) : undefined;
-  const investment = investmentStr ? parseFloat(investmentStr) : undefined;
-  const targetAmount = targetAmountStr ? parseFloat(targetAmountStr) : undefined;
-  const poolAuthorized = poolAuthorizedStr ? parseInt(poolAuthorizedStr) : undefined;
 
   // Check if this is a priced round and there are unconverted SAFEs
   let shouldConvertSAFEs = false;
@@ -808,10 +789,8 @@ async function saveRound() {
     round.type = type;
     round.pricePerShare = type === "priced" ? price : undefined;
     round.moneyRaised = type === "priced" ? moneyRaised : undefined;
-    round.targetShares = type === "priced" ? targetShares : undefined;
     round.valuationCap = type === "safe" ? cap : undefined;
     round.investmentAmount = type === "safe" ? investment : undefined;
-    round.targetAmount = type === "safe" ? targetAmount : undefined;
     round.authorizedShares = type === "equity-pool" ? poolAuthorized : undefined;
     round.date = date;
     round.color = color;
@@ -824,10 +803,8 @@ async function saveRound() {
       type,
       pricePerShare: type === "priced" ? price : undefined,
       moneyRaised: type === "priced" ? moneyRaised : undefined,
-      targetShares: type === "priced" ? targetShares : undefined,
       valuationCap: type === "safe" ? cap : undefined,
       investmentAmount: type === "safe" ? investment : undefined,
-      targetAmount: type === "safe" ? targetAmount : undefined,
       authorizedShares: type === "equity-pool" ? poolAuthorized : undefined,
       date,
       color,
