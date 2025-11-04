@@ -1,6 +1,7 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { exportToCSV, parseCSV, downloadCSVTemplate } from "./csv-handler.js";
 import { renderTreemap as renderTreemapModule } from "./treemap-renderer.js";
+import * as ScenarioManager from "./scenario-manager.js";
 
 // State
 let capTable = null;
@@ -84,10 +85,40 @@ async function init() {
   });
   document.getElementById("csv-file-input").addEventListener("change", handleCSVImport);
 
+  // Scenario management
+  document.getElementById("scenario-select").addEventListener("change", async (e) => {
+    const scenarioName = e.target.value;
+    const loadedCapTable = await ScenarioManager.loadScenario(scenarioName, init);
+    if (loadedCapTable) {
+      capTable = loadedCapTable;
+      refreshUI();
+    }
+  });
+  document.getElementById("save-scenario").addEventListener("click", () => {
+    ScenarioManager.saveScenario(capTable);
+  });
+  document.getElementById("delete-scenario").addEventListener("click", () => {
+    ScenarioManager.deleteScenario(init);
+  });
+
   // Window resize
   window.addEventListener("resize", () => renderTreemap());
 
+  // Load scenarios list
+  ScenarioManager.loadScenariosList();
+
   // Render rounds list
+  renderRoundsList();
+}
+
+// Refresh all UI elements
+function refreshUI() {
+  document.getElementById("company-name").textContent = capTable.companyName;
+  document.getElementById("input-company-name").value = capTable.companyName;
+  document.getElementById("input-authorized-shares").value = capTable.authorizedShares;
+  updateStats();
+  updateLegend();
+  renderTreemap();
   renderRoundsList();
 }
 

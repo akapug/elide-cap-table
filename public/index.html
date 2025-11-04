@@ -492,6 +492,21 @@
 
         <div class="sidebar-section">
           <div class="section-header">
+            <h2>Scenarios</h2>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <select id="scenario-select" style="padding: 8px; border-radius: 4px; border: 1px solid #374151;">
+              <option value="current">Current (Live Data)</option>
+            </select>
+            <div style="display: flex; gap: 8px;">
+              <button id="save-scenario" class="secondary" style="flex: 1;">Save As...</button>
+              <button id="delete-scenario" class="secondary" style="flex: 1;">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="section-header">
             <h2>Data Management</h2>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -613,7 +628,7 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=8"></script>
+  <script type="module" src="/app.js?v=9"></script>
 </body>
 </html>
 

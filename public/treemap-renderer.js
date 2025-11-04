@@ -196,10 +196,24 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 }
 
 function capTableToTree(capTable, mode) {
-  const getValue = (shares, pricePerShare) => {
+  // Helper to get value based on mode
+  const getValue = (shares, round) => {
     if (mode === "shares") return shares;
-    // For valuation mode, use price if available, otherwise 0
-    return shares * (pricePerShare || 0);
+
+    // For valuation mode:
+    // - Priced rounds: use price per share
+    // - SAFE rounds: use valuation cap to estimate current value
+    // - Equity pools: use 0 (no price yet)
+    if (round.type === "priced" && round.pricePerShare) {
+      return shares * round.pricePerShare;
+    } else if (round.type === "safe" && round.valuationCap) {
+      // Estimate SAFE value using valuation cap
+      // SAFE converts at: min(valuation cap, next round valuation - money raised)
+      // For display purposes, use valuation cap as implied share price
+      const impliedPricePerShare = round.valuationCap / capTable.authorizedShares;
+      return shares * impliedPricePerShare;
+    }
+    return 0;
   };
 
   const children = capTable.rounds.map((round) => ({
@@ -210,7 +224,7 @@ function capTableToTree(capTable, mode) {
     value: 0,
     children: round.allocations.map((allocation) => ({
       name: allocation.holderName,
-      value: getValue(allocation.shares, round.pricePerShare),
+      value: getValue(allocation.shares, round),
       round: round.name,
       roundColor: round.color,
       type: allocation.type,
