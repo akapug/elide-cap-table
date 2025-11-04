@@ -55,6 +55,9 @@ function initEventListeners() {
   document.getElementById("allocation-cancel").addEventListener("click", closeAllocationModal);
   document.getElementById("allocation-save").addEventListener("click", saveAllocation);
 
+  // Offer calculator - update as user types shares
+  document.getElementById("allocation-shares").addEventListener("input", updateOfferCalculator);
+
   // CSV import/export
   document.getElementById("export-csv").addEventListener("click", () => exportToCSV(capTable));
   document.getElementById("import-csv").addEventListener("click", () => {
@@ -249,7 +252,9 @@ function updateStats() {
     (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
     0
   );
-  const remaining = capTable.authorizedShares - totalIssued;
+  const fullyDiluted = capTable.authorizedShares;
+  const remaining = fullyDiluted - totalIssued;
+  const remainingPct = ((remaining / fullyDiluted) * 100).toFixed(2);
   const totalHolders = capTable.rounds.reduce((sum, round) => sum + round.allocations.length, 0);
 
   // Calculate current effective valuation and price per share
@@ -257,7 +262,9 @@ function updateStats() {
   const effectiveValuation = totalIssued * effectivePricePerShare;
 
   document.getElementById("stat-allocated").textContent = formatNumber(totalIssued);
+  document.getElementById("stat-fully-diluted").textContent = formatNumber(fullyDiluted);
   document.getElementById("stat-unallocated").textContent = formatNumber(remaining);
+  document.getElementById("stat-unallocated-pct").textContent = `${remainingPct}% of cap`;
   document.getElementById("stat-rounds").textContent = capTable.rounds.length;
   document.getElementById("stat-holders").textContent = totalHolders;
   document.getElementById("stat-valuation").textContent = effectiveValuation > 0
@@ -269,6 +276,7 @@ function updateStats() {
 
   // Store globally for treemap renderer
   window._effectivePricePerShare = effectivePricePerShare;
+  window._fullyDilutedShares = fullyDiluted;
 }
 
 // Toggle stats modal
@@ -879,12 +887,55 @@ function openAllocationModal(roundId, allocationId = null) {
   }
 
   modal.classList.add("visible");
+
+  // Update offer calculator on modal open
+  updateOfferCalculator();
 }
 
 function closeAllocationModal() {
   document.getElementById("allocation-modal").classList.remove("visible");
   editingAllocation = null;
   // Don't clear editingRoundId - we might be returning to allocations list
+
+  // Hide offer calculator
+  document.getElementById("offer-calculator").style.display = "none";
+}
+
+// Update the Quick Offer Calculator as user types
+function updateOfferCalculator() {
+  const sharesInput = document.getElementById("allocation-shares").value.trim();
+  const calculator = document.getElementById("offer-calculator");
+
+  if (!sharesInput || isNaN(sharesInput) || parseFloat(sharesInput) <= 0) {
+    calculator.style.display = "none";
+    return;
+  }
+
+  const shares = parseFloat(sharesInput);
+  const totalIssued = capTable.rounds.reduce(
+    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
+    0
+  );
+  const fullyDiluted = capTable.authorizedShares;
+  const effectivePrice = window._effectivePricePerShare || 0;
+
+  // Calculate percentages
+  const fdPct = ((shares / fullyDiluted) * 100).toFixed(4);
+  const issuedPct = ((shares / totalIssued) * 100).toFixed(4);
+  const estimatedValue = shares * effectivePrice;
+
+  // Update display
+  document.getElementById("offer-calc-shares").textContent = `${formatNumber(Math.round(shares))} shares`;
+  document.getElementById("offer-calc-fd-pct").textContent = `= ${fdPct}% fully diluted ✓ (use for offers)`;
+  document.getElementById("offer-calc-issued-pct").textContent = `= ${issuedPct}% of currently issued`;
+
+  if (effectivePrice > 0) {
+    document.getElementById("offer-calc-value").textContent = `Est. value: $${formatNumber(Math.round(estimatedValue))} (at $${effectivePrice.toFixed(2)}/share)`;
+  } else {
+    document.getElementById("offer-calc-value").textContent = `Est. value: N/A (no priced rounds yet)`;
+  }
+
+  calculator.style.display = "block";
 }
 
 async function saveAllocation() {

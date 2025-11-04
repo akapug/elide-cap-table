@@ -197,11 +197,12 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 
   // Calculate total shares for ownership % from the hierarchy (total issued shares)
   const totalShares = hierarchy.value;
+  const fullyDiluted = window._fullyDilutedShares || totalShares;
 
   // Store totalShares globally for tooltip calculations
   window._totalIssuedShares = totalShares;
 
-  // Add ownership % for rounds (second line)
+  // Add ownership % for rounds (second line) - show fully diluted by default
   leaf
     .filter((d) => d.depth === 1)
     .append("text")
@@ -211,8 +212,13 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
       const width = d.x1 - d.x0;
       const height = d.y1 - d.y0;
       if (width > 60 && height > 35 && viewMode === "shares") {
-        const ownership = (d.value / totalShares) * 100;
-        return ownership.toFixed(2) + "% ownership";
+        const fdOwnership = (d.value / fullyDiluted) * 100;
+        const issuedOwnership = (d.value / totalShares) * 100;
+        // Show fully diluted, with issued in parentheses if different
+        if (Math.abs(fdOwnership - issuedOwnership) > 0.01) {
+          return `${fdOwnership.toFixed(2)}% FD (${issuedOwnership.toFixed(2)}% issued)`;
+        }
+        return `${fdOwnership.toFixed(2)}% fully diluted`;
       }
       return "";
     })
@@ -240,7 +246,7 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .attr("opacity", 0.9)
     .style("pointer-events", "none");
 
-  // Add ownership % for allocations (third line)
+  // Add ownership % for allocations (third line) - show fully diluted
   leaf
     .filter((d) => d.depth === 2)
     .append("text")
@@ -250,8 +256,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
       const width = d.x1 - d.x0;
       const height = d.y1 - d.y0;
       if (width > 60 && height > 45 && viewMode === "shares") {
-        const ownership = (d.value / totalShares) * 100;
-        return ownership.toFixed(2) + "%";
+        const fdOwnership = (d.value / fullyDiluted) * 100;
+        return fdOwnership.toFixed(4) + "% FD";
       }
       return "";
     })
@@ -306,9 +312,29 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
       tooltip.html(html);
     })
     .on("mousemove", (event) => {
+      // Position tooltip with viewport boundary detection
+      const tooltipNode = tooltip.node();
+      const tooltipHeight = tooltipNode.offsetHeight;
+      const tooltipWidth = tooltipNode.offsetWidth;
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      let top = event.pageY - 10;
+      let left = event.pageX + 10;
+
+      // Check if tooltip would go off bottom of viewport
+      if (event.clientY + tooltipHeight + 10 > viewportHeight) {
+        top = event.pageY - tooltipHeight - 10;
+      }
+
+      // Check if tooltip would go off right of viewport
+      if (event.clientX + tooltipWidth + 10 > viewportWidth) {
+        left = event.pageX - tooltipWidth - 10;
+      }
+
       tooltip
-        .style("top", event.pageY - 10 + "px")
-        .style("left", event.pageX + 10 + "px");
+        .style("top", top + "px")
+        .style("left", left + "px");
     })
     .on("mouseout", () => {
       tooltip.style("visibility", "hidden");
@@ -392,18 +418,24 @@ function capTableToTree(capTable, mode) {
 
 function createTooltipHTML(d, capTable, viewMode) {
   const lines = [];
-  
+  const totalIssued = window._totalIssuedShares || 1;
+  const fullyDiluted = window._fullyDilutedShares || totalIssued;
+
   if (d.depth === 1) {
     // Round
     lines.push(`<div style="font-weight: bold; margin-bottom: 4px;">${d.data.name}</div>`);
     lines.push(`<div>Round: ${d.data.name}</div>`);
-    
+
     const totalShares = d.children ? d.children.reduce((sum, c) => sum + c.data.shares, 0) : 0;
     lines.push(`<div>Shares: ${formatNumber(totalShares)}</div>`);
 
-    const ownership = ((totalShares / window._totalIssuedShares) * 100).toFixed(2);
-    lines.push(`<div>Ownership: ${ownership}%</div>`);
-    
+    const fdOwnership = ((totalShares / fullyDiluted) * 100).toFixed(4);
+    const issuedOwnership = ((totalShares / totalIssued) * 100).toFixed(2);
+    lines.push(`<div style="font-weight: bold;">${fdOwnership}% fully diluted</div>`);
+    if (Math.abs(parseFloat(fdOwnership) - parseFloat(issuedOwnership)) > 0.01) {
+      lines.push(`<div style="opacity: 0.8; font-size: 11px;">(${issuedOwnership}% of issued)</div>`);
+    }
+
     if (d.data.roundType === 'safe' && d.data.valuationCap) {
       lines.push(`<div>Valuation Cap: $${formatNumber(d.data.valuationCap)}</div>`);
     } else if (d.data.pricePerShare) {
@@ -416,8 +448,12 @@ function createTooltipHTML(d, capTable, viewMode) {
     lines.push(`<div>Type: ${d.data.type}</div>`);
     lines.push(`<div>Shares: ${formatNumber(d.data.shares)}</div>`);
 
-    const ownership = ((d.data.shares / window._totalIssuedShares) * 100).toFixed(2);
-    lines.push(`<div>Ownership: ${ownership}%</div>`);
+    const fdOwnership = ((d.data.shares / fullyDiluted) * 100).toFixed(4);
+    const issuedOwnership = ((d.data.shares / totalIssued) * 100).toFixed(4);
+    lines.push(`<div style="font-weight: bold;">${fdOwnership}% fully diluted</div>`);
+    if (Math.abs(parseFloat(fdOwnership) - parseFloat(issuedOwnership)) > 0.01) {
+      lines.push(`<div style="opacity: 0.8; font-size: 11px;">(${issuedOwnership}% of issued)</div>`);
+    }
 
     // Add estimated value if effective price is available
     const effectivePrice = window._effectivePricePerShare || 0;
@@ -433,7 +469,7 @@ function createTooltipHTML(d, capTable, viewMode) {
       lines.push(`<div style="font-style: italic; margin-top: 4px;">${d.data.notes}</div>`);
     }
   }
-  
+
   return lines.join('');
 }
 

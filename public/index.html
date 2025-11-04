@@ -469,7 +469,7 @@
             <input type="text" id="input-company-name" placeholder="Acme Corp">
           </div>
           <div class="form-group">
-            <label>Authorized Shares</label>
+            <label>Fully Diluted Share Cap <span style="font-size: 11px; opacity: 0.7;" title="Maximum shares that can be issued. Used to calculate 'fully diluted' ownership %.">ⓘ</span></label>
             <input type="number" id="input-authorized-shares" placeholder="10000000">
           </div>
           <button id="save-company">Save Company Info</button>
@@ -607,6 +607,15 @@
       <div class="form-group">
         <label for="allocation-shares">Shares</label>
         <input type="number" id="allocation-shares" placeholder="100000">
+
+        <!-- Quick Offer Calculator - shows live as user types -->
+        <div id="offer-calculator" style="background: #1f2937; padding: 10px; border-radius: 4px; margin-top: 8px; font-size: 12px; display: none;">
+          <div style="font-weight: bold; margin-bottom: 6px; color: #4ade80;">Quick Offer Summary:</div>
+          <div id="offer-calc-shares" style="margin-bottom: 4px;">-</div>
+          <div id="offer-calc-fd-pct" style="margin-bottom: 4px; font-weight: bold;">-</div>
+          <div id="offer-calc-issued-pct" style="margin-bottom: 4px; opacity: 0.8;">-</div>
+          <div id="offer-calc-value" style="color: #4ade80;">-</div>
+        </div>
       </div>
       <div class="form-group">
         <label>Type</label>
@@ -642,12 +651,17 @@
       <div class="modal-body">
         <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
           <div class="stat-card">
-            <div class="stat-label">Total Issued</div>
+            <div class="stat-label">Total Issued Shares</div>
             <div class="stat-value" id="stat-allocated">-</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Remaining (of cap)</div>
+            <div class="stat-label">Fully Diluted Shares</div>
+            <div class="stat-value" id="stat-fully-diluted">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Unallocated Pool</div>
             <div class="stat-value" id="stat-unallocated">-</div>
+            <div style="font-size: 11px; opacity: 0.7; margin-top: 4px;" id="stat-unallocated-pct">-</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Current Valuation</div>
@@ -664,6 +678,24 @@
           <div class="stat-card">
             <div class="stat-label">Total Holders</div>
             <div class="stat-value" id="stat-holders">-</div>
+          </div>
+        </div>
+
+        <!-- Dilution Explainer -->
+        <div style="background: #1f2937; padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.5;">
+          <div style="font-weight: bold; margin-bottom: 8px;">📊 Understanding Fully Diluted Ownership</div>
+          <div style="margin-bottom: 8px;">
+            <strong>"Fully Diluted"</strong> means your % if ALL authorized shares were issued.
+            This is the standard for equity offers because:
+          </div>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li>Conservative (accounts for future hires from pool)</li>
+            <li>Matches how VCs calculate ownership</li>
+            <li>Won't over-promise to advisors</li>
+          </ul>
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #374151;">
+            <strong>"Dilution"</strong> happens when new shares are issued, reducing everyone's %.
+            Example: If company issues 1M new shares, your 15K goes from 0.10% → 0.09% fully diluted.
           </div>
         </div>
       </div>
