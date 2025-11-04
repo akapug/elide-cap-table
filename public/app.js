@@ -840,8 +840,17 @@ async function saveAllocation() {
       alert("Please enter a valid investment amount");
       return;
     }
-    // Calculate implied shares: (investment / valuation cap) × authorized shares
-    shares = Math.round((investmentAmount / round.valuationCap) * capTable.authorizedShares);
+    // Calculate ownership percentage: investment / valuation cap
+    // Then apply to total issued shares (excluding this SAFE round to avoid circular dependency)
+    const ownershipPercent = investmentAmount / round.valuationCap;
+
+    // Total issued shares excluding ALL SAFE rounds (since they don't have fixed shares yet)
+    const totalIssuedExcludingSAFEs = capTable.rounds
+      .filter(r => r.type !== 'safe')
+      .reduce((sum, r) => sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0);
+
+    // Apply ownership % to the non-SAFE issued shares
+    shares = Math.round(ownershipPercent * totalIssuedExcludingSAFEs);
   } else {
     shares = parseInt(sharesStr);
     if (isNaN(shares) || shares <= 0) {
