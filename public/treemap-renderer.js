@@ -260,13 +260,15 @@ function capTableToTree(capTable, mode) {
     return 0;
   };
 
-  const children = capTable.rounds.map((round) => ({
-    name: round.name,
-    round: round.name,
-    roundColor: round.color,
-    roundType: round.type,
-    value: 0,
-    children: round.allocations.map((allocation) => ({
+  // Calculate unallocated shares first
+  const totalAllocated = capTable.rounds.reduce(
+    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
+    0
+  );
+  const unallocated = capTable.authorizedShares - totalAllocated;
+
+  const children = capTable.rounds.map((round) => {
+    const roundChildren = round.allocations.map((allocation) => ({
       name: allocation.holderName,
       value: getValue(allocation.shares, round),
       round: round.name,
@@ -278,25 +280,31 @@ function capTableToTree(capTable, mode) {
       shares: allocation.shares,
       vestingSchedule: allocation.vestingSchedule,
       notes: allocation.notes,
-    })),
-  }));
+    }));
 
-  // Calculate unallocated
-  const totalAllocated = capTable.rounds.reduce(
-    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
-    0
-  );
-  const unallocated = capTable.authorizedShares - totalAllocated;
+    // Add unallocated shares to equity pool round
+    if (round.type === "equity-pool" && unallocated > 0) {
+      roundChildren.push({
+        name: "Unallocated",
+        value: getValue(unallocated, round),
+        round: round.name,
+        roundColor: round.color,
+        type: "unallocated",
+        holderName: "Unallocated",
+        shares: unallocated,
+        isUnallocated: true,
+      });
+    }
 
-  if (unallocated > 0) {
-    children.push({
-      name: "Unallocated",
-      value: getValue(unallocated, 0),
-      round: "Unallocated",
-      roundColor: "#6b7280",
-      children: [],
-    });
-  }
+    return {
+      name: round.name,
+      round: round.name,
+      roundColor: round.color,
+      roundType: round.type,
+      value: 0,
+      children: roundChildren,
+    };
+  });
 
   return {
     name: capTable.companyName,
