@@ -37,8 +37,9 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 
   treemap(hierarchy);
 
-  // Determine which nodes to show
+  // Determine which nodes to show and their click targets
   let nodesToShow;
+  let clickTargetMap = new Map(); // Maps node to what should happen when clicked
 
   if (zoomNode) {
     // When zoomed, find the zoomed node and rescale its children
@@ -61,12 +62,29 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
 
       // Show only the direct children of the zoomed node
       nodesToShow = zoomedNode.children;
+      // Each child clicks on itself
+      zoomedNode.children.forEach(child => clickTargetMap.set(child, child));
     } else {
       nodesToShow = [];
     }
   } else {
-    // When not zoomed, show only the direct children of root (rounds, not allocations)
-    nodesToShow = hierarchy.children || [];
+    // When not zoomed, show rounds AND their nested allocations
+    // But clicking on any allocation should zoom to its parent round
+    const rounds = hierarchy.children || [];
+    nodesToShow = [];
+
+    rounds.forEach(round => {
+      nodesToShow.push(round);
+      clickTargetMap.set(round, round); // Round clicks on itself
+
+      // Add all descendants (allocations)
+      if (round.children) {
+        round.descendants().slice(1).forEach(descendant => {
+          nodesToShow.push(descendant);
+          clickTargetMap.set(descendant, round); // Allocation clicks zoom to parent round
+        });
+      }
+    });
   }
 
   // Create groups for each node
@@ -91,7 +109,9 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .style("cursor", "pointer")
     .on("click", (event, d) => {
       event.stopPropagation();
-      onNodeClick(d);
+      // Use the click target from the map (allocations click their parent round)
+      const target = clickTargetMap.get(d) || d;
+      onNodeClick(target);
     });
 
   // Add text labels - ALWAYS show for rounds (depth 1)
