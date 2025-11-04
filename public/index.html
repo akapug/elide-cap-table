@@ -442,6 +442,7 @@
           <button id="view-shares" class="active">Share Count</button>
           <button id="view-value">Valuation</button>
         </div>
+        <button id="toggle-stats">Stats</button>
         <button id="toggle-sidebar">Edit Data</button>
         <button id="reset-zoom" class="secondary">Reset Zoom</button>
       </div>
@@ -472,28 +473,6 @@
             <input type="number" id="input-authorized-shares" placeholder="10000000">
           </div>
           <button id="save-company">Save Company Info</button>
-        </div>
-
-        <div class="sidebar-section">
-          <h2>Statistics</h2>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Total Issued</div>
-              <div class="stat-value" id="stat-allocated">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Remaining (of 15M cap)</div>
-              <div class="stat-value" id="stat-unallocated">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Total Rounds</div>
-              <div class="stat-value" id="stat-rounds">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Total Holders</div>
-              <div class="stat-value" id="stat-holders">-</div>
-            </div>
-          </div>
         </div>
 
         <div class="sidebar-section">
@@ -649,6 +628,47 @@
       <div class="modal-actions">
         <button class="secondary" id="allocation-cancel">Cancel</button>
         <button id="allocation-save">Save Allocation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Modal -->
+  <div id="stats-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>Cap Table Statistics</h2>
+        <button class="modal-close" id="stats-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="stat-card">
+            <div class="stat-label">Total Issued</div>
+            <div class="stat-value" id="stat-allocated">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Remaining (of cap)</div>
+            <div class="stat-value" id="stat-unallocated">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Current Valuation</div>
+            <div class="stat-value" id="stat-valuation">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Effective Price/Share</div>
+            <div class="stat-value" id="stat-price-per-share">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Rounds</div>
+            <div class="stat-value" id="stat-rounds">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Holders</div>
+            <div class="stat-value" id="stat-holders">-</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="stats-done" class="secondary">Close</button>
       </div>
     </div>
   </div>

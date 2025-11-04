@@ -11,52 +11,24 @@ let currentZoomNode = null;
 let editingRound = null;
 let editingAllocation = null;
 let editingRoundId = null;
+let eventListenersInitialized = false;
 
-// Initialize
-async function init() {
-  // Load data from API (SQLite backend) with localStorage fallback
-  try {
-    const response = await fetch("/api/captable");
-    if (response.ok) {
-      capTable = await response.json();
-    } else {
-      // Fallback to localStorage
-      const saved = localStorage.getItem("capTable");
-      if (saved) {
-        capTable = JSON.parse(saved);
-      } else {
-        capTable = createSampleCapTable();
-        await saveData();
-      }
-    }
-  } catch (error) {
-    console.warn("API not available, using localStorage:", error);
-    // Fallback to localStorage
-    const saved = localStorage.getItem("capTable");
-    if (saved) {
-      capTable = JSON.parse(saved);
-    } else {
-      capTable = createSampleCapTable();
-      await saveData();
-    }
-  }
+// Initialize event listeners (only once)
+function initEventListeners() {
+  if (eventListenersInitialized) return;
+  eventListenersInitialized = true;
 
-  // Set company name
-  document.getElementById("company-name").textContent = capTable.companyName;
-  document.getElementById("input-company-name").value = capTable.companyName;
-  document.getElementById("input-authorized-shares").value = capTable.authorizedShares;
-
-  // Render
-  updateStats();
-  updateLegend();
-  renderTreemap();
-
-  // Event listeners
+  // View mode
   document.getElementById("view-shares").addEventListener("click", () => setViewMode("shares"));
   document.getElementById("view-value").addEventListener("click", () => setViewMode("value"));
+  document.getElementById("toggle-stats").addEventListener("click", toggleStatsModal);
   document.getElementById("toggle-sidebar").addEventListener("click", toggleSidebar);
   document.getElementById("reset-zoom").addEventListener("click", resetZoom);
   document.getElementById("save-company").addEventListener("click", saveCompanyInfo);
+
+  // Stats modal
+  document.getElementById("stats-modal-close").addEventListener("click", closeStatsModal);
+  document.getElementById("stats-done").addEventListener("click", closeStatsModal);
   document.getElementById("add-round").addEventListener("click", () => openRoundModal());
 
   // Round modal
@@ -108,6 +80,49 @@ async function init() {
 
   // Window resize
   window.addEventListener("resize", () => renderTreemap());
+}
+
+// Initialize
+async function init() {
+  // Load data from API (SQLite backend) with localStorage fallback
+  try {
+    const response = await fetch("/api/captable");
+    if (response.ok) {
+      capTable = await response.json();
+    } else {
+      // Fallback to localStorage
+      const saved = localStorage.getItem("capTable");
+      if (saved) {
+        capTable = JSON.parse(saved);
+      } else {
+        capTable = createSampleCapTable();
+        await saveData();
+      }
+    }
+  } catch (error) {
+    console.warn("API not available, using localStorage:", error);
+    // Fallback to localStorage
+    const saved = localStorage.getItem("capTable");
+    if (saved) {
+      capTable = JSON.parse(saved);
+    } else {
+      capTable = createSampleCapTable();
+      await saveData();
+    }
+  }
+
+  // Set company name
+  document.getElementById("company-name").textContent = capTable.companyName;
+  document.getElementById("input-company-name").value = capTable.companyName;
+  document.getElementById("input-authorized-shares").value = capTable.authorizedShares;
+
+  // Initialize event listeners (only once)
+  initEventListeners();
+
+  // Render
+  updateStats();
+  updateLegend();
+  renderTreemap();
 
   // Load scenarios list
   ScenarioManager.loadScenariosList();
@@ -212,10 +227,54 @@ function updateStats() {
   const remaining = capTable.authorizedShares - totalIssued;
   const totalHolders = capTable.rounds.reduce((sum, round) => sum + round.allocations.length, 0);
 
+  // Calculate current effective valuation and price per share
+  let effectiveValuation = 0;
+  let effectivePricePerShare = 0;
+
+  // Find the most recent priced round
+  const pricedRounds = capTable.rounds.filter(r => r.type === 'priced' && r.pricePerShare);
+  if (pricedRounds.length > 0) {
+    // Use the last priced round's price
+    const lastPricedRound = pricedRounds[pricedRounds.length - 1];
+    effectivePricePerShare = lastPricedRound.pricePerShare;
+    effectiveValuation = totalIssued * effectivePricePerShare;
+  } else {
+    // No priced rounds yet - use SAFE valuation cap if available
+    const safeRounds = capTable.rounds.filter(r => r.type === 'safe' && r.valuationCap);
+    if (safeRounds.length > 0) {
+      // Use the highest SAFE valuation cap as proxy
+      const highestCap = Math.max(...safeRounds.map(r => r.valuationCap));
+      effectiveValuation = highestCap;
+      effectivePricePerShare = totalIssued > 0 ? highestCap / totalIssued : 0;
+    }
+  }
+
   document.getElementById("stat-allocated").textContent = formatNumber(totalIssued);
   document.getElementById("stat-unallocated").textContent = formatNumber(remaining);
   document.getElementById("stat-rounds").textContent = capTable.rounds.length;
   document.getElementById("stat-holders").textContent = totalHolders;
+  document.getElementById("stat-valuation").textContent = effectiveValuation > 0
+    ? `$${formatNumber(Math.round(effectiveValuation))}`
+    : 'N/A';
+  document.getElementById("stat-price-per-share").textContent = effectivePricePerShare > 0
+    ? `$${effectivePricePerShare.toFixed(4)}`
+    : 'N/A';
+}
+
+// Toggle stats modal
+function toggleStatsModal() {
+  const modal = document.getElementById("stats-modal");
+  if (modal.classList.contains("visible")) {
+    closeStatsModal();
+  } else {
+    updateStats(); // Refresh stats before showing
+    modal.classList.add("visible");
+  }
+}
+
+// Close stats modal
+function closeStatsModal() {
+  document.getElementById("stats-modal").classList.remove("visible");
 }
 
 // Update legend

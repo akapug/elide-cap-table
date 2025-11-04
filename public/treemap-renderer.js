@@ -94,26 +94,27 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .join("g")
     .attr("transform", (d) => `translate(${d.x0},${d.y0})`);
 
-  // Create drop shadow filter
+  // Create pronounced drop shadow filter for 3D effect
   const defs = svg.select('defs').empty() ? svg.insert('defs', ':first-child') : svg.select('defs');
 
   const dropShadow = defs.append('filter')
     .attr('id', 'drop-shadow')
-    .attr('height', '130%');
+    .attr('height', '150%')
+    .attr('width', '150%');
 
   dropShadow.append('feGaussianBlur')
     .attr('in', 'SourceAlpha')
-    .attr('stdDeviation', 3);
+    .attr('stdDeviation', 5);  // Increased from 3 to 5
 
   dropShadow.append('feOffset')
-    .attr('dx', 2)
-    .attr('dy', 2)
+    .attr('dx', 4)  // Increased from 2 to 4
+    .attr('dy', 4)  // Increased from 2 to 4
     .attr('result', 'offsetblur');
 
   dropShadow.append('feComponentTransfer')
     .append('feFuncA')
     .attr('type', 'linear')
-    .attr('slope', 0.5);
+    .attr('slope', 0.7);  // Increased from 0.5 to 0.7 for darker shadow
 
   const feMerge = dropShadow.append('feMerge');
   feMerge.append('feMergeNode');
