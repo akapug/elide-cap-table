@@ -194,8 +194,11 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
     .attr("font-size", (d) => (d.depth === 1 ? "12px" : "10px"))
     .style("pointer-events", "none");
 
-  // Calculate total shares for ownership % from the hierarchy
+  // Calculate total shares for ownership % from the hierarchy (total issued shares)
   const totalShares = hierarchy.value;
+
+  // Store totalShares globally for tooltip calculations
+  window._totalIssuedShares = totalShares;
 
   // Add ownership % for rounds (second line)
   leaf
@@ -375,8 +378,8 @@ function createTooltipHTML(d, capTable, viewMode) {
     
     const totalShares = d.children ? d.children.reduce((sum, c) => sum + c.data.shares, 0) : 0;
     lines.push(`<div>Shares: ${formatNumber(totalShares)}</div>`);
-    
-    const ownership = ((totalShares / capTable.authorizedShares) * 100).toFixed(2);
+
+    const ownership = ((totalShares / window._totalIssuedShares) * 100).toFixed(2);
     lines.push(`<div>Ownership: ${ownership}%</div>`);
     
     if (d.data.roundType === 'safe' && d.data.valuationCap) {
@@ -390,8 +393,8 @@ function createTooltipHTML(d, capTable, viewMode) {
     lines.push(`<div>Round: ${d.data.round}</div>`);
     lines.push(`<div>Type: ${d.data.type}</div>`);
     lines.push(`<div>Shares: ${formatNumber(d.data.shares)}</div>`);
-    
-    const ownership = ((d.data.shares / capTable.authorizedShares) * 100).toFixed(2);
+
+    const ownership = ((d.data.shares / window._totalIssuedShares) * 100).toFixed(2);
     lines.push(`<div>Ownership: ${ownership}%</div>`);
     
     if (d.data.vestingSchedule) {
