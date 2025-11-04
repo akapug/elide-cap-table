@@ -399,6 +399,52 @@ function capTableToTree(capTable, mode) {
       }
     }
 
+    // For SAFE rounds with targetAmount, show unallocated investment capacity
+    if (round.type === "safe" && round.targetAmount) {
+      const totalInvested = round.allocations.reduce((sum, a) => sum + (a.investmentAmount || 0), 0);
+      const remainingCapacity = round.targetAmount - totalInvested;
+
+      if (remainingCapacity > 0 && round.valuationCap) {
+        // Calculate shares for unallocated portion using same formula as allocations
+        const ownershipPercent = remainingCapacity / round.valuationCap;
+        const totalIssuedExcludingSAFEs = capTable.rounds
+          .filter(r => r.type !== 'safe')
+          .reduce((sum, r) => sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0);
+        const unallocatedShares = Math.round(ownershipPercent * totalIssuedExcludingSAFEs);
+
+        roundChildren.push({
+          name: "Unallocated",
+          value: getValue(unallocatedShares, round),
+          round: round.name,
+          roundColor: round.color,
+          type: "unallocated",
+          holderName: "Unallocated (to raise)",
+          shares: unallocatedShares,
+          investmentAmount: remainingCapacity,
+          isUnallocated: true,
+        });
+      }
+    }
+
+    // For priced rounds with targetShares, show unallocated shares
+    if (round.type === "priced" && round.targetShares) {
+      const allocatedShares = round.allocations.reduce((sum, a) => sum + a.shares, 0);
+      const unallocatedShares = round.targetShares - allocatedShares;
+
+      if (unallocatedShares > 0) {
+        roundChildren.push({
+          name: "Unallocated",
+          value: getValue(unallocatedShares, round),
+          round: round.name,
+          roundColor: round.color,
+          type: "unallocated",
+          holderName: "Unallocated (to sell)",
+          shares: unallocatedShares,
+          isUnallocated: true,
+        });
+      }
+    }
+
     return {
       name: round.name,
       round: round.name,
