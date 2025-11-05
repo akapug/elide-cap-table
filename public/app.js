@@ -34,6 +34,11 @@ function initEventListeners() {
   document.getElementById("stats-done").addEventListener("click", closeStatsModal);
   document.getElementById("add-round").addEventListener("click", () => openRoundModal());
 
+  // Keyboard shortcuts modal
+  document.getElementById("keyboard-help").addEventListener("click", openKeyboardShortcutsModal);
+  document.getElementById("keyboard-shortcuts-close").addEventListener("click", closeKeyboardShortcutsModal);
+  document.getElementById("keyboard-shortcuts-done").addEventListener("click", closeKeyboardShortcutsModal);
+
   // Round modal
   document.getElementById("round-modal-close").addEventListener("click", closeRoundModal);
   document.getElementById("round-cancel").addEventListener("click", closeRoundModal);
@@ -89,6 +94,46 @@ function initEventListeners() {
         }
       }
     }
+
+    // V key to toggle view mode (shares ↔ valuation)
+    if (e.key === "v" || e.key === "V") {
+      // Don't trigger if typing in an input
+      if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+        return;
+      }
+      const newMode = currentViewMode === "shares" ? "value" : "shares";
+      setViewMode(newMode);
+    }
+
+    // N key to add new round (Ctrl/Cmd + N)
+    if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+      e.preventDefault();
+      // Only if no modal is open
+      const visibleModals = document.querySelectorAll(".modal.visible");
+      if (visibleModals.length === 0) {
+        document.getElementById("add-round").click();
+      }
+    }
+
+    // R key to reset zoom
+    if (e.key === "r" || e.key === "R") {
+      // Don't trigger if typing in an input
+      if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+        return;
+      }
+      if (currentZoomNode) {
+        resetZoom();
+      }
+    }
+
+    // ? key to show keyboard shortcuts
+    if (e.key === "?") {
+      // Don't trigger if typing in an input
+      if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+        return;
+      }
+      openKeyboardShortcutsModal();
+    }
   });
 
   // CSV import/export
@@ -97,6 +142,14 @@ function initEventListeners() {
     document.getElementById("csv-file-input").click();
   });
   document.getElementById("csv-file-input").addEventListener("change", handleCSVImport);
+
+  // Custom events from treemap (double-click handlers)
+  window.addEventListener('editRound', (e) => {
+    openRoundModal(e.detail.roundId);
+  });
+  window.addEventListener('editAllocation', (e) => {
+    openAllocationModal(e.detail.roundId, e.detail.allocationId);
+  });
 
   // Scenario management
   document.getElementById("scenario-select").addEventListener("change", async (e) => {
@@ -369,6 +422,16 @@ function closeStatsModal() {
   document.getElementById("stats-modal").classList.remove("visible");
 }
 
+// Open keyboard shortcuts modal
+function openKeyboardShortcutsModal() {
+  document.getElementById("keyboard-shortcuts-modal").classList.add("visible");
+}
+
+// Close keyboard shortcuts modal
+function closeKeyboardShortcutsModal() {
+  document.getElementById("keyboard-shortcuts-modal").classList.remove("visible");
+}
+
 // Update legend
 function updateLegend() {
   const legendItems = document.getElementById("legend-items");
@@ -400,9 +463,19 @@ function renderTreemap() {
   updateBreadcrumb();
 }
 
-// Zoom to node
+// Zoom to node or edit allocation
 function zoomToNode(node) {
-  if (node.children) {
+  // If it's a leaf node (allocation), open the allocation editor
+  if (!node.children && node.depth === 2) {
+    // This is an allocation - find the round and allocation IDs
+    const roundNode = node.parent;
+    const roundId = roundNode.data.id;
+    const allocationId = node.data.id;
+
+    // Open allocation modal for editing
+    openAllocationModal(roundId, allocationId);
+  } else if (node.children) {
+    // It's a round - zoom in
     currentZoomNode = node;
     renderTreemap();
   }

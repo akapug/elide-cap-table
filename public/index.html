@@ -462,8 +462,8 @@
       <h1 id="company-name">Cap Table Visualizer</h1>
       <div class="controls">
         <div class="view-toggle">
-          <button id="view-shares" class="active">Share Count</button>
-          <button id="view-value">Valuation</button>
+          <button id="view-shares" class="active" title="Keyboard: V">Share Count</button>
+          <button id="view-value" title="Keyboard: V">Valuation</button>
         </div>
         <div class="view-toggle" style="margin-left: 8px;">
           <button id="unalloc-grey" class="active" title="Show unallocated portions in grey">Grey Unalloc</button>
@@ -471,7 +471,8 @@
         </div>
         <button id="toggle-stats">Stats</button>
         <button id="toggle-sidebar">Edit Data</button>
-        <button id="reset-zoom" class="secondary">Reset Zoom</button>
+        <button id="reset-zoom" class="secondary" title="Keyboard: R">Reset Zoom</button>
+        <button id="keyboard-help" class="secondary" title="Show keyboard shortcuts" style="padding: 0.5rem 0.75rem;">⌨️</button>
       </div>
     </header>
 
@@ -737,7 +738,50 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=11"></script>
+  <!-- Keyboard Shortcuts Modal -->
+  <div id="keyboard-shortcuts-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>⌨️ Keyboard Shortcuts</h2>
+        <button class="modal-close" id="keyboard-shortcuts-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 12px 20px; font-size: 14px;">
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">?</kbd>
+          <span>Show this help (keyboard shortcuts)</span>
+
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">V</kbd>
+          <span>Toggle view mode (Shares ↔ Valuation)</span>
+
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">R</kbd>
+          <span>Reset zoom to overview</span>
+
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+N</kbd>
+          <span>Add new round</span>
+
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">ESC</kbd>
+          <span>Close modal</span>
+
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Enter</kbd>
+          <span>Submit form (when in input field)</span>
+        </div>
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #374151; font-size: 13px; opacity: 0.8;">
+          <strong>Mouse Actions:</strong>
+          <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+            <li>Click round → Zoom in</li>
+            <li>Click allocation → Edit allocation</li>
+            <li>Double-click round → Edit round details</li>
+            <li>Click breadcrumb → Navigate back</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="keyboard-shortcuts-done" class="secondary">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js?v=12"></script>
 </body>
 </html>
 

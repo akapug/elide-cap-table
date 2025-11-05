@@ -6,6 +6,9 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
   const width = container.clientWidth;
   const height = container.clientHeight;
 
+  // Store reference to onNodeClick for double-click handler
+  window._onNodeClick = onNodeClick;
+
   // Clear previous
   container.innerHTML = "";
 
@@ -179,6 +182,21 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
       // Use the click target from the map (allocations click their parent round)
       const target = clickTargetMap.get(d) || d;
       onNodeClick(target);
+    })
+    .on("dblclick", (event, d) => {
+      event.stopPropagation();
+      // Double-click on round (depth 1) opens round editor
+      if (d.depth === 1) {
+        // Dispatch custom event to open round modal
+        window.dispatchEvent(new CustomEvent('editRound', { detail: { roundId: d.data.id } }));
+      }
+      // Double-click on allocation (depth 2) opens allocation editor (same as single click)
+      else if (d.depth === 2) {
+        const roundNode = d.parent;
+        const roundId = roundNode.data.id;
+        const allocationId = d.data.id;
+        window.dispatchEvent(new CustomEvent('editAllocation', { detail: { roundId, allocationId } }));
+      }
     });
 
   // Add text labels - ALWAYS show for rounds (depth 1)
