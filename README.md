@@ -22,9 +22,25 @@ An interactive cap table visualization tool using the **filesystem/treemap analo
 1. **Share Count View** (default) - Shows allocation of authorized shares
 2. **Valuation View** - Shows current value based on latest round pricing
 
+### Ownership Calculations
+- **Fully Diluted Ownership** - VC-standard calculation including:
+  - All issued shares (common + priced rounds)
+  - All equity pool shares (allocated + unallocated reserved)
+  - All SAFE shares as if converted at their cap
+- **Issued Ownership** - Current ownership % of issued shares only
+- **Quick Offer Calculator** - Live calculator for equity offers showing fully diluted %
+
+### Round Types
+- **Priced Rounds** - Traditional equity rounds with price per share
+- **SAFE Rounds** - Simple Agreement for Future Equity with valuation cap
+- **Equity Pools** - Employee/advisor option pools with authorized shares
+- **Unallocated Visualization** - Shows remaining capacity in each round type
+
 ### Data Management
 - **Edit company info** - name and authorized shares
-- **Real-time statistics** - allocated, unallocated, rounds, holders
+- **Real-time statistics** - fully diluted shares, issued shares, unallocated capacity
+- **Scenario planning** - Save/load different future cap table scenarios
+- **CSV import/export** - Import from spreadsheets, export for analysis
 - **localStorage persistence** - data survives page refreshes
 - **Legend** - visual guide to round colors
 
@@ -150,14 +166,54 @@ Update the `color` field in each round. Recommended palette:
 - Series C: `#8b5cf6` (purple)
 - Unallocated: `#6b7280` (gray)
 
+## 🔌 Carta API Integration (Coming Soon)
+
+The app is designed to integrate with Carta's API for automatic cap table syncing. When Carta API access becomes available:
+
+### Setup
+1. Obtain Carta API credentials (invite-only access required)
+2. Add credentials to environment variables:
+   ```bash
+   CARTA_API_KEY=your_api_key
+   CARTA_ORG_ID=your_org_id
+   ```
+
+### Implementation Plan
+- Create `public/carta-sync.js` module for API integration
+- Add "Sync from Carta" button in UI
+- Map Carta data model to our cap table structure:
+  - Carta Securities → Rounds
+  - Carta Stakeholders → Allocations
+  - Carta Valuations → Price per share
+- Handle SAFE notes, convertible notes, and option pools
+- Implement incremental sync (only fetch changes)
+- Add conflict resolution UI for manual edits vs Carta data
+
+### Data Mapping
+```javascript
+// Carta API → Our Model
+{
+  securities: [...],        // → rounds[]
+  stakeholders: [...],      // → allocations[]
+  valuations: [...],        // → pricePerShare
+  authorized_shares: N      // → authorizedShares
+}
+```
+
+See `docs/carta-integration.md` (to be created) for detailed implementation guide.
+
 ## 🎯 Future Enhancements
 
-- [ ] Add/edit/delete rounds via UI
-- [ ] Add/edit/delete allocations via UI
-- [ ] Export to CSV/JSON
-- [ ] Import from spreadsheet
+- [x] Add/edit/delete rounds via UI
+- [x] Add/edit/delete allocations via UI
+- [x] Export to CSV/JSON
+- [x] Import from CSV
+- [x] Dilution calculator
+- [x] SAFE round support
+- [x] Equity pool management
+- [x] Scenario planning
+- [ ] Carta API integration (pending invite-only access)
 - [ ] Waterfall analysis (liquidation preferences)
-- [ ] Dilution calculator
 - [ ] Time-series view (cap table evolution)
 - [ ] Multi-company support
 

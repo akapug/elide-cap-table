@@ -1,7 +1,7 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 // Render treemap with nested allocations visible (WinDirStat style)
-export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
+export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unallocColorMode = "grey") {
   const container = document.getElementById("treemap");
   const width = container.clientWidth;
   const height = container.clientHeight;
@@ -124,7 +124,20 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick) {
   leaf
     .append("rect")
     .attr("fill", (d) => {
-      const baseColor = d.data.roundColor || "#6b7280";
+      let baseColor = d.data.roundColor || "#6b7280";
+
+      // Handle unallocated portions
+      if (d.data.isUnallocated) {
+        if (unallocColorMode === "grey") {
+          baseColor = "#4b5563"; // Dark grey for unallocated
+        } else if (unallocColorMode === "tinted") {
+          // Use 80% opacity tint of the round color
+          const roundColor = d3.color(d.data.roundColor || "#6b7280");
+          roundColor.opacity = 0.4; // 40% opacity for darker tint
+          baseColor = roundColor.formatRgb();
+        }
+      }
+
       // Create a unique gradient ID for each node
       const gradientId = `gradient-${d.data.name.replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`;
 

@@ -7,6 +7,7 @@ import { calculateDilution, formatOwnership, formatCurrency, convertSAFEs } from
 // State
 let capTable = null;
 let currentViewMode = "shares";
+let currentUnallocColorMode = "grey"; // "grey" or "tinted"
 let currentZoomNode = null;
 let editingRound = null;
 let editingAllocation = null;
@@ -21,6 +22,8 @@ function initEventListeners() {
   // View mode
   document.getElementById("view-shares").addEventListener("click", () => setViewMode("shares"));
   document.getElementById("view-value").addEventListener("click", () => setViewMode("value"));
+  document.getElementById("unalloc-grey").addEventListener("click", () => setUnallocColorMode("grey"));
+  document.getElementById("unalloc-tinted").addEventListener("click", () => setUnallocColorMode("tinted"));
   document.getElementById("toggle-stats").addEventListener("click", toggleStatsModal);
   document.getElementById("toggle-sidebar").addEventListener("click", toggleSidebar);
   document.getElementById("reset-zoom").addEventListener("click", resetZoom);
@@ -214,6 +217,14 @@ function setViewMode(mode) {
   renderTreemap();
 }
 
+// Unallocated color mode
+function setUnallocColorMode(mode) {
+  currentUnallocColorMode = mode;
+  document.getElementById("unalloc-grey").classList.toggle("active", mode === "grey");
+  document.getElementById("unalloc-tinted").classList.toggle("active", mode === "tinted");
+  renderTreemap();
+}
+
 // Sidebar
 function toggleSidebar() {
   const sidebar = document.getElementById("sidebar");
@@ -278,15 +289,44 @@ function getEffectivePricePerShare() {
   return 0;
 }
 
+/**
+ * Calculate true fully diluted shares:
+ * = All issued shares (common + priced rounds)
+ * + All equity pool shares (allocated + unallocated reserved)
+ * + All SAFE shares as if converted at their cap
+ */
+function calculateFullyDilutedShares() {
+  let fullyDiluted = 0;
+
+  capTable.rounds.forEach(round => {
+    if (round.type === 'equity-pool') {
+      // For equity pools, count the full authorized amount (allocated + unallocated)
+      fullyDiluted += round.authorizedShares || 0;
+    } else if (round.type === 'safe') {
+      // For SAFEs, count shares as if converted at cap
+      // Formula: (investmentAmount / valuationCap) * totalIssuedExcludingSAFEs
+      // But we need to calculate this iteratively since SAFEs affect each other
+      // For now, just count the current shares (which are calculated correctly)
+      fullyDiluted += round.allocations.reduce((sum, a) => sum + a.shares, 0);
+    } else {
+      // For priced rounds and common stock, count issued shares
+      fullyDiluted += round.allocations.reduce((sum, a) => sum + a.shares, 0);
+    }
+  });
+
+  return fullyDiluted;
+}
+
 // Update statistics
 function updateStats() {
   const totalIssued = capTable.rounds.reduce(
     (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
     0
   );
-  const fullyDiluted = capTable.authorizedShares;
-  const remaining = fullyDiluted - totalIssued;
-  const remainingPct = ((remaining / fullyDiluted) * 100).toFixed(2);
+  const fullyDiluted = calculateFullyDilutedShares();
+  const authorized = capTable.authorizedShares;
+  const remaining = authorized - fullyDiluted;
+  const remainingPct = ((remaining / authorized) * 100).toFixed(2);
   const totalHolders = capTable.rounds.reduce((sum, round) => sum + round.allocations.length, 0);
 
   // Calculate current effective valuation and price per share
@@ -296,7 +336,7 @@ function updateStats() {
   document.getElementById("stat-allocated").textContent = formatNumber(totalIssued);
   document.getElementById("stat-fully-diluted").textContent = formatNumber(fullyDiluted);
   document.getElementById("stat-unallocated").textContent = formatNumber(remaining);
-  document.getElementById("stat-unallocated-pct").textContent = `${remainingPct}% of cap`;
+  document.getElementById("stat-unallocated-pct").textContent = `${remainingPct}% of authorized cap`;
   document.getElementById("stat-rounds").textContent = capTable.rounds.length;
   document.getElementById("stat-holders").textContent = totalHolders;
   document.getElementById("stat-valuation").textContent = effectiveValuation > 0
@@ -309,6 +349,7 @@ function updateStats() {
   // Store globally for treemap renderer
   window._effectivePricePerShare = effectivePricePerShare;
   window._fullyDilutedShares = fullyDiluted;
+  window._authorizedShares = authorized;
 }
 
 // Toggle stats modal
@@ -354,7 +395,7 @@ function updateLegend() {
 
 // Render treemap
 function renderTreemap() {
-  renderTreemapModule(capTable, currentViewMode, currentZoomNode, zoomToNode);
+  renderTreemapModule(capTable, currentViewMode, currentZoomNode, zoomToNode, currentUnallocColorMode);
   updateBreadcrumb();
 }
 
@@ -423,7 +464,7 @@ function showTooltip(event, d) {
   html += `<div class="tooltip-row"><span class="tooltip-label">Shares:</span> <span>${formatNumber(shares)}</span></div>`;
 
   // Percentage
-  const total = capTable.authorizedShares;
+  const total = calculateFullyDilutedShares();
   html += `<div class="tooltip-row"><span class="tooltip-label">Ownership:</span> <span>${calculatePercentage(shares, total)}</span></div>`;
 
   // Value (if in value mode or has price)
@@ -514,11 +555,9 @@ function capTableToTree(capTable, mode) {
     })),
   }));
 
-  const totalAllocated = capTable.rounds.reduce(
-    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
-    0
-  );
-  const unallocated = capTable.authorizedShares - totalAllocated;
+  const fullyDiluted = calculateFullyDilutedShares();
+  const authorized = capTable.authorizedShares;
+  const unallocated = authorized - fullyDiluted;
 
   if (unallocated > 0) {
     children.push({
@@ -1006,7 +1045,7 @@ function updateOfferCalculator() {
     (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
     0
   );
-  const fullyDiluted = capTable.authorizedShares;
+  const fullyDiluted = calculateFullyDilutedShares();
   const effectivePrice = window._effectivePricePerShare || 0;
 
   // Calculate percentages
