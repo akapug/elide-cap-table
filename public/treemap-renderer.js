@@ -123,6 +123,36 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
   feMerge.append('feMergeNode');
   feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
+  // Add round header when zoomed (clickable to edit round)
+  if (zoomNode && zoomNode.data) {
+    const headerGroup = svg.append('g')
+      .attr('class', 'round-header')
+      .style('cursor', 'pointer')
+      .on('click', () => {
+        window.dispatchEvent(new CustomEvent('editRound', { detail: { roundId: zoomNode.data.id } }));
+      });
+
+    // Background rect for header
+    headerGroup.append('rect')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', width)
+      .attr('height', 19)
+      .attr('fill', zoomNode.data.roundColor || '#334155')
+      .attr('opacity', 0.9);
+
+    // Round name text
+    headerGroup.append('text')
+      .attr('x', 6)
+      .attr('y', 13)
+      .attr('fill', '#fff')
+      .attr('font-weight', 'bold')
+      .attr('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('user-select', 'none')
+      .text(zoomNode.data.name + ' (click to edit)');
+  }
+
   // Add rectangles with gradient for 3D effect (WinDirStat style)
   leaf
     .append("rect")
@@ -179,21 +209,34 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .style("cursor", "pointer")
     .on("click", (event, d) => {
       event.stopPropagation();
-      // Use the click target from the map (allocations click their parent round)
-      const target = clickTargetMap.get(d) || d;
-      onNodeClick(target);
+
+      // When zoomed in: allocation clicks open editor
+      // When at overview: allocation clicks zoom to parent round
+      if (d.depth === 2 && !d.data.isUnallocated) {
+        if (zoomNode) {
+          // Zoomed in - open allocation editor
+          const roundId = d.data.roundId;
+          const allocationId = d.data.id;
+          window.dispatchEvent(new CustomEvent('editAllocation', { detail: { roundId, allocationId } }));
+        } else {
+          // At overview - zoom to parent round
+          onNodeClick(d.parent);
+        }
+      }
+      // If it's a round (depth 1), zoom in
+      else if (d.depth === 1) {
+        onNodeClick(d);
+      }
     })
     .on("dblclick", (event, d) => {
       event.stopPropagation();
       // Double-click on round (depth 1) opens round editor
       if (d.depth === 1) {
-        // Dispatch custom event to open round modal
         window.dispatchEvent(new CustomEvent('editRound', { detail: { roundId: d.data.id } }));
       }
-      // Double-click on allocation (depth 2) opens allocation editor (same as single click)
+      // Double-click on allocation also opens allocation editor (same as single click)
       else if (d.depth === 2) {
-        const roundNode = d.parent;
-        const roundId = roundNode.data.id;
+        const roundId = d.data.roundId;
         const allocationId = d.data.id;
         window.dispatchEvent(new CustomEvent('editAllocation', { detail: { roundId, allocationId } }));
       }
@@ -201,6 +244,7 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
 
   // Add text labels - ALWAYS show for rounds (depth 1)
   // For allocations (depth 2), only show if there's space
+  // IMPORTANT: pointer-events none so clicks go through to the rect
   leaf
     .append("text")
     .attr("x", 4)
@@ -224,7 +268,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .attr("fill", "#fff")
     .attr("font-weight", (d) => (d.depth === 1 ? "bold" : "normal"))
     .attr("font-size", (d) => (d.depth === 1 ? "12px" : "10px"))
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("user-select", "none"); // Prevent text selection on click
 
   // Calculate total shares for ownership % from the hierarchy (total issued shares)
   const totalShares = hierarchy.value;
@@ -256,7 +301,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .attr("fill", "#fff")
     .attr("font-size", "10px")
     .attr("opacity", 0.9)
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("user-select", "none");
 
   // Add share count and ownership % below name for allocations
   leaf
@@ -275,7 +321,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .attr("fill", "#fff")
     .attr("font-size", "9px")
     .attr("opacity", 0.9)
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("user-select", "none");
 
   // Add ownership % for allocations (third line) - show fully diluted
   leaf
@@ -296,7 +343,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .attr("font-size", "9px")
     .attr("opacity", 0.8)
     .attr("font-weight", "bold")
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("user-select", "none");
 
   // Add estimated value for allocations (fourth line)
   leaf
@@ -317,7 +365,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .attr("fill", "#fff")
     .attr("font-size", "9px")
     .attr("opacity", 0.7)
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("user-select", "none");
 
   // Tooltip - remove any existing tooltips first
   d3.selectAll(".treemap-tooltip").remove();
@@ -400,8 +449,10 @@ function capTableToTree(capTable, mode) {
       name: allocation.holderName,
       value: getValue(allocation.shares, round),
       round: round.name,
+      roundId: round.id,
       roundColor: round.color,
       type: allocation.type,
+      id: allocation.id,
       pricePerShare: round.pricePerShare,
       valuationCap: round.valuationCap,
       holderName: allocation.holderName,
@@ -479,6 +530,7 @@ function capTableToTree(capTable, mode) {
 
     return {
       name: round.name,
+      id: round.id,
       round: round.name,
       roundColor: round.color,
       roundType: round.type,

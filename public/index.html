@@ -489,14 +489,6 @@
     <header>
       <h1 id="company-name">Cap Table Visualizer</h1>
       <div class="controls">
-        <div class="view-toggle">
-          <button id="view-shares" class="active" title="Keyboard: V">Share Count</button>
-          <button id="view-value" title="Keyboard: V">Valuation</button>
-        </div>
-        <div class="view-toggle" style="margin-left: 8px;">
-          <button id="unalloc-grey" class="active" title="Show unallocated portions in grey">Grey Unalloc</button>
-          <button id="unalloc-tinted" title="Show unallocated portions in tinted round color">Tinted Unalloc</button>
-        </div>
         <button id="toggle-stats">Stats</button>
         <button id="toggle-sidebar">Edit Data</button>
         <button id="reset-zoom" class="secondary" title="Keyboard: R">Reset Zoom</button>
@@ -529,6 +521,24 @@
             <input type="number" id="input-authorized-shares" placeholder="10000000">
           </div>
           <button id="save-company">Save Company Info</button>
+        </div>
+
+        <div class="sidebar-section">
+          <h2>View Options</h2>
+          <div class="form-group">
+            <label>Display Mode</label>
+            <div class="view-toggle">
+              <button id="view-shares" class="active">Share Count</button>
+              <button id="view-value">Valuation</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Unallocated Display</label>
+            <div class="view-toggle">
+              <button id="unalloc-grey" class="active">Grey</button>
+              <button id="unalloc-tinted">Tinted</button>
+            </div>
+          </div>
         </div>
 
         <div class="sidebar-section">
@@ -695,9 +705,12 @@
         <label>Notes (optional)</label>
         <input type="text" id="allocation-notes" placeholder="Additional notes">
       </div>
-      <div class="modal-actions">
-        <button class="secondary" id="allocation-cancel">Cancel</button>
-        <button id="allocation-save">Save Allocation</button>
+      <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center;">
+        <button class="secondary" id="allocation-edit-round" style="margin-right: auto;">Edit Round</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="secondary" id="allocation-cancel">Cancel</button>
+          <button id="allocation-save">Save Allocation</button>
+        </div>
       </div>
     </div>
   </div>

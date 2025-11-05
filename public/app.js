@@ -62,6 +62,13 @@ function initEventListeners() {
   document.getElementById("allocation-modal-close").addEventListener("click", closeAllocationModal);
   document.getElementById("allocation-cancel").addEventListener("click", closeAllocationModal);
   document.getElementById("allocation-save").addEventListener("click", saveAllocation);
+  document.getElementById("allocation-edit-round").addEventListener("click", () => {
+    // Close allocation modal and open round modal for the current round
+    if (editingRoundId) {
+      closeAllocationModal();
+      openRoundModal(editingRoundId);
+    }
+  });
 
   // Offer calculator - update as user types shares or FD %
   document.getElementById("allocation-shares").addEventListener("input", onSharesInput);
@@ -494,14 +501,19 @@ function updateBreadcrumb() {
     node = node.parent;
   }
 
-  // Add root
+  // Add root (company name)
   const rootSpan = document.createElement("span");
   rootSpan.textContent = capTable.companyName;
   rootSpan.addEventListener("click", resetZoom);
   breadcrumb.appendChild(rootSpan);
 
-  // Add path
+  // Add path (skip nodes that have the same name as company - those are the root)
   path.forEach((node) => {
+    // Skip if this node's name is the same as company name (it's the root)
+    if (node.data.name === capTable.companyName) {
+      return;
+    }
+
     const span = document.createElement("span");
     span.textContent = node.data.name;
     span.addEventListener("click", () => {
