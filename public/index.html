@@ -26,19 +26,21 @@
 
     /* Header */
     header {
-      background: #1e293b;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
       padding: 1rem 2rem;
       border-bottom: 2px solid #334155;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-shrink: 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
     }
 
     h1 {
       font-size: 1.5rem;
       font-weight: 600;
       color: #f1f5f9;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .controls {
@@ -52,23 +54,29 @@
       color: white;
       border: none;
       padding: 0.5rem 1rem;
-      border-radius: 0.375rem;
+      border-radius: 0.5rem;
       cursor: pointer;
       font-size: 0.875rem;
       font-weight: 500;
-      transition: background 0.2s;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     button:hover {
       background: #2563eb;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      transform: translateY(-1px);
     }
 
     button.secondary {
       background: #475569;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     button.secondary:hover {
       background: #334155;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      transform: translateY(-1px);
     }
 
     .view-toggle {
@@ -205,10 +213,11 @@
     /* Sidebar */
     #sidebar {
       width: 350px;
-      background: #1e293b;
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
       border-left: 2px solid #334155;
       overflow-y: auto;
       flex-shrink: 0;
+      box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.3);
     }
 
     #sidebar.hidden {
@@ -225,6 +234,7 @@
       font-weight: 600;
       margin-bottom: 1rem;
       color: #f1f5f9;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .form-group {
@@ -332,14 +342,15 @@
     }
 
     .modal-content {
-      background: #1e293b;
-      border-radius: 0.5rem;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-radius: 0.75rem;
       padding: 2rem;
       max-width: 500px;
       width: 90%;
       max-height: 90vh;
       overflow-y: auto;
       border: 2px solid #334155;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
     }
 
     .modal-header {
@@ -352,6 +363,7 @@
     .modal-header h2 {
       font-size: 1.5rem;
       color: #f1f5f9;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .modal-close {
@@ -388,37 +400,53 @@
     .list-item {
       background: #0f172a;
       border: 1px solid #334155;
-      border-radius: 0.375rem;
+      border-radius: 0.5rem;
       padding: 1rem;
       margin-bottom: 0.75rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .list-item:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+      transform: translateY(-1px);
     }
 
     .list-item-info {
       flex: 1;
+      margin-bottom: 0.75rem;
     }
 
     .list-item-title {
       font-weight: 600;
+      font-size: 1.125rem;
       color: #f1f5f9;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .list-item-details {
       font-size: 0.875rem;
       color: #94a3b8;
+      line-height: 1.5;
     }
 
     .list-item-actions {
       display: flex;
       gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .list-item-actions button {
-      padding: 0.375rem 0.75rem;
-      font-size: 0.75rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.8125rem;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .list-item-actions button:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      transform: translateY(-1px);
     }
 
     .section-header {
@@ -756,7 +784,7 @@
           <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">R</kbd>
           <span>Reset zoom to overview</span>
 
-          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl+N</kbd>
+          <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">N</kbd>
           <span>Add new round</span>
 
           <kbd style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-family: monospace;">ESC</kbd>

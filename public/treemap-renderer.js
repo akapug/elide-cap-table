@@ -107,17 +107,17 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
 
   dropShadow.append('feGaussianBlur')
     .attr('in', 'SourceAlpha')
-    .attr('stdDeviation', 6);  // Increased from 5 to 6 for more blur
+    .attr('stdDeviation', 8);  // Even more blur for dramatic effect
 
   dropShadow.append('feOffset')
-    .attr('dx', 5)  // Increased from 4 to 5
-    .attr('dy', 5)  // Increased from 4 to 5
+    .attr('dx', 6)  // More offset
+    .attr('dy', 6)  // More offset
     .attr('result', 'offsetblur');
 
   dropShadow.append('feComponentTransfer')
     .append('feFuncA')
     .attr('type', 'linear')
-    .attr('slope', 0.9);  // Increased from 0.7 to 0.9 for much darker shadow
+    .attr('slope', 1.2);  // Much darker, more pronounced shadow
 
   const feMerge = dropShadow.append('feMerge');
   feMerge.append('feMergeNode');

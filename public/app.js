@@ -105,9 +105,12 @@ function initEventListeners() {
       setViewMode(newMode);
     }
 
-    // N key to add new round (Ctrl/Cmd + N)
-    if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-      e.preventDefault();
+    // N key to add new round
+    if (e.key === "n" || e.key === "N") {
+      // Don't trigger if typing in an input
+      if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+        return;
+      }
       // Only if no modal is open
       const visibleModals = document.querySelectorAll(".modal.visible");
       if (visibleModals.length === 0) {
@@ -465,20 +468,12 @@ function renderTreemap() {
 
 // Zoom to node or edit allocation
 function zoomToNode(node) {
-  // If it's a leaf node (allocation), open the allocation editor
-  if (!node.children && node.depth === 2) {
-    // This is an allocation - find the round and allocation IDs
-    const roundNode = node.parent;
-    const roundId = roundNode.data.id;
-    const allocationId = node.data.id;
-
-    // Open allocation modal for editing
-    openAllocationModal(roundId, allocationId);
-  } else if (node.children) {
-    // It's a round - zoom in
+  // If it's a round with children - zoom in
+  if (node.children) {
     currentZoomNode = node;
     renderTreemap();
   }
+  // Note: Allocations are now handled by double-click only
 }
 
 // Reset zoom
@@ -694,7 +689,7 @@ function renderRoundsList() {
 
     item.innerHTML = `
       <div class="list-item-info">
-        <div class="list-item-title" style="color: ${round.color}">${round.name}</div>
+        <div class="list-item-title" style="color: ${round.color}; text-shadow: 0 0 10px ${round.color}40;">${round.name}</div>
         <div class="list-item-details">${roundDetails}</div>
       </div>
       <div class="list-item-actions">
