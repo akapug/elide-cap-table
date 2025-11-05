@@ -221,7 +221,6 @@ async function init() {
   // Set company name
   document.getElementById("company-name").textContent = capTable.companyName;
   document.getElementById("input-company-name").value = capTable.companyName;
-  document.getElementById("input-authorized-shares").value = capTable.authorizedShares;
 
   // Initialize event listeners (only once)
   initEventListeners();
@@ -242,7 +241,6 @@ async function init() {
 function refreshUI() {
   document.getElementById("company-name").textContent = capTable.companyName;
   document.getElementById("input-company-name").value = capTable.companyName;
-  document.getElementById("input-authorized-shares").value = capTable.authorizedShares;
   updateStats();
   updateLegend();
   renderTreemap();
@@ -305,7 +303,6 @@ function toggleSidebar() {
 // Save company info
 async function saveCompanyInfo() {
   capTable.companyName = document.getElementById("input-company-name").value;
-  capTable.authorizedShares = parseInt(document.getElementById("input-authorized-shares").value);
   document.getElementById("company-name").textContent = capTable.companyName;
   await saveData();
   updateStats();
@@ -393,7 +390,11 @@ function updateStats() {
     0
   );
   const fullyDiluted = calculateFullyDilutedShares();
-  const authorized = capTable.authorizedShares;
+
+  // Auto-calculate authorized shares: fully diluted + 20% buffer for future rounds
+  const authorized = Math.ceil(fullyDiluted * 1.2);
+  capTable.authorizedShares = authorized;
+
   const remaining = authorized - fullyDiluted;
   const remainingPct = ((remaining / authorized) * 100).toFixed(2);
   const totalHolders = capTable.rounds.reduce((sum, round) => sum + round.allocations.length, 0);
@@ -738,7 +739,9 @@ function capTableToTree(capTable, mode) {
   }));
 
   const fullyDiluted = calculateFullyDilutedShares();
-  const authorized = capTable.authorizedShares;
+
+  // Auto-calculate authorized shares: fully diluted + 20% buffer
+  const authorized = Math.ceil(fullyDiluted * 1.2);
   const unallocated = authorized - fullyDiluted;
 
   if (unallocated > 0) {

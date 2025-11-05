@@ -1,5 +1,19 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
+// Helper function to truncate text to fit within a given width
+function truncateText(text, width, fontSize) {
+  // Rough estimate: each character is ~0.6 * fontSize pixels wide
+  const charWidth = fontSize * 0.6;
+  const maxChars = Math.floor((width - 8) / charWidth); // -8 for padding
+
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  // Truncate and add ellipsis
+  return text.substring(0, maxChars - 1) + "…";
+}
+
 // Render treemap with nested allocations visible (WinDirStat style)
 export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unallocColorMode = "grey") {
   const container = document.getElementById("treemap");
@@ -172,7 +186,9 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
       }
 
       // Create a unique gradient ID for each node
-      const gradientId = `gradient-${d.data.name.replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`;
+      // Remove all non-alphanumeric characters except hyphens to ensure valid CSS ID
+      const safeName = d.data.name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
+      const gradientId = `gradient-${safeName}-${Math.random().toString(36).substr(2, 9)}`;
 
       // Parse base color to create lighter/darker variants with more contrast
       const lighter = d3.color(baseColor).brighter(1.0);  // Increased from 0.8 to 1.0
@@ -255,12 +271,12 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
 
       // Always show round names if width > 40
       if (d.depth === 1 && width > 40) {
-        return d.data.name;
+        return truncateText(d.data.name, width, 12);
       }
 
       // Show allocation names if there's enough space
       if (d.depth === 2 && width > 60 && height > 20) {
-        return d.data.name;
+        return truncateText(d.data.name, width, 10);
       }
 
       return "";
