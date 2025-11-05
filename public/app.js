@@ -58,8 +58,9 @@ function initEventListeners() {
   document.getElementById("allocation-cancel").addEventListener("click", closeAllocationModal);
   document.getElementById("allocation-save").addEventListener("click", saveAllocation);
 
-  // Offer calculator - update as user types shares
-  document.getElementById("allocation-shares").addEventListener("input", updateOfferCalculator);
+  // Offer calculator - update as user types shares or FD %
+  document.getElementById("allocation-shares").addEventListener("input", onSharesInput);
+  document.getElementById("allocation-fd-pct").addEventListener("input", onFdPctInput);
 
   // Global keyboard shortcuts
   document.addEventListener("keydown", (e) => {
@@ -960,14 +961,20 @@ function openAllocationModal(roundId, allocationId = null) {
   const title = document.getElementById("allocation-modal-title");
   const round = capTable.rounds.find((r) => r.id === roundId);
 
-  // Update label based on round type
+  // Update label and visibility based on round type
   const sharesLabel = document.querySelector('label[for="allocation-shares"]');
+  const fdPctGroup = document.getElementById("allocation-fd-pct").closest('.form-group');
+
   if (round.type === 'safe') {
     sharesLabel.textContent = 'Investment Amount ($)';
     document.getElementById("allocation-shares").placeholder = "100000";
+    // Hide FD % field for SAFE rounds
+    fdPctGroup.style.display = 'none';
   } else {
     sharesLabel.textContent = 'Shares';
     document.getElementById("allocation-shares").placeholder = "100000";
+    // Show FD % field for equity-pool and priced rounds
+    fdPctGroup.style.display = 'block';
   }
 
   if (allocationId) {
@@ -977,8 +984,13 @@ function openAllocationModal(roundId, allocationId = null) {
     // For SAFE rounds, show investment amount; otherwise show shares
     if (round.type === 'safe' && allocation.investmentAmount) {
       document.getElementById("allocation-shares").value = allocation.investmentAmount;
+      document.getElementById("allocation-fd-pct").value = "";
     } else {
       document.getElementById("allocation-shares").value = allocation.shares;
+      // Calculate and populate FD %
+      const fullyDiluted = calculateFullyDilutedShares();
+      const fdPct = ((allocation.shares / fullyDiluted) * 100).toFixed(4);
+      document.getElementById("allocation-fd-pct").value = fdPct;
     }
     document.getElementById("allocation-type").value = allocation.type;
     document.getElementById("allocation-vesting").value = allocation.vestingSchedule || "";
@@ -1000,6 +1012,7 @@ function openAllocationModal(roundId, allocationId = null) {
     }
 
     document.getElementById("allocation-shares").value = defaultValue;
+    document.getElementById("allocation-fd-pct").value = "";
     document.getElementById("allocation-type").value = "common";
     document.getElementById("allocation-vesting").value = "";
     document.getElementById("allocation-notes").value = "";
@@ -1021,6 +1034,44 @@ function closeAllocationModal() {
 
   // Hide offer calculator
   document.getElementById("offer-calculator").style.display = "none";
+}
+
+// Handle shares input - update FD % field
+function onSharesInput() {
+  const sharesInput = document.getElementById("allocation-shares").value.trim();
+  const fdPctField = document.getElementById("allocation-fd-pct");
+
+  if (sharesInput && !isNaN(sharesInput) && parseFloat(sharesInput) > 0) {
+    const shares = parseFloat(sharesInput);
+    const fullyDiluted = calculateFullyDilutedShares();
+    const fdPct = ((shares / fullyDiluted) * 100).toFixed(4);
+
+    // Update FD % field without triggering its input event
+    fdPctField.value = fdPct;
+  } else {
+    fdPctField.value = '';
+  }
+
+  updateOfferCalculator();
+}
+
+// Handle FD % input - update shares field
+function onFdPctInput() {
+  const fdPctInput = document.getElementById("allocation-fd-pct").value.trim();
+  const sharesField = document.getElementById("allocation-shares");
+
+  if (fdPctInput && !isNaN(fdPctInput) && parseFloat(fdPctInput) > 0) {
+    const fdPct = parseFloat(fdPctInput);
+    const fullyDiluted = calculateFullyDilutedShares();
+    const shares = Math.round((fdPct / 100) * fullyDiluted);
+
+    // Update shares field without triggering its input event
+    sharesField.value = shares;
+  } else {
+    sharesField.value = '';
+  }
+
+  updateOfferCalculator();
 }
 
 // Update the Quick Offer Calculator as user types
