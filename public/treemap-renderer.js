@@ -171,7 +171,8 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
   leaf
     .append("rect")
     .attr("fill", (d) => {
-      let baseColor = d.data.roundColor || "#6b7280";
+      // Ensure we have a valid color, fallback to grey if not
+      let baseColor = (d.data.roundColor && d.data.roundColor.trim()) || "#6b7280";
 
       // Handle unallocated portions
       if (d.data.isUnallocated) {
@@ -179,7 +180,7 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
           baseColor = "#4b5563"; // Dark grey for unallocated
         } else if (unallocColorMode === "tinted") {
           // Use 80% opacity tint of the round color
-          const roundColor = d3.color(d.data.roundColor || "#6b7280");
+          const roundColor = d3.color((d.data.roundColor && d.data.roundColor.trim()) || "#6b7280");
           roundColor.opacity = 0.4; // 40% opacity for darker tint
           baseColor = roundColor.formatRgb();
         }
@@ -191,8 +192,15 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
       const gradientId = `gradient-${safeName}-${Math.random().toString(36).substr(2, 9)}`;
 
       // Parse base color to create lighter/darker variants with more contrast
-      const lighter = d3.color(baseColor).brighter(1.0);  // Increased from 0.8 to 1.0
-      const darker = d3.color(baseColor).darker(1.2);     // Increased from 0.5 to 1.2 for much darker edges
+      // Add safety check in case d3.color returns null
+      const parsedColor = d3.color(baseColor);
+      if (!parsedColor) {
+        console.warn('Invalid color:', baseColor, 'for node:', d.data.name);
+        return '#6b7280'; // Fallback to grey
+      }
+
+      const lighter = parsedColor.brighter(1.0);  // Increased from 0.8 to 1.0
+      const darker = parsedColor.darker(1.2);     // Increased from 0.5 to 1.2 for much darker edges
 
       // Create radial gradient for more pronounced 3D effect
       const gradient = defs.append('radialGradient')

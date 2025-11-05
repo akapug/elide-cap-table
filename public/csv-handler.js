@@ -328,13 +328,13 @@ function parseSingleScenario(lines, startIndex) {
         id: 'round-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         name: roundName,
         type: roundType || 'priced',
-        pricePerShare: pricePerShare ? parseFloat(pricePerShare) : undefined,
-        moneyRaised: moneyRaised ? parseFloat(moneyRaised) : undefined,
-        valuationCap: valuationCap ? parseFloat(valuationCap) : undefined,
-        investmentAmount: investmentAmount ? parseFloat(investmentAmount) : undefined,
-        authorizedShares: authorizedShares ? parseInt(authorizedShares) : undefined,
-        date: date || new Date().toISOString().split('T')[0],
-        color: color || '#' + Math.floor(Math.random() * 16777215).toString(16),
+        pricePerShare: pricePerShare && pricePerShare.trim() ? parseFloat(pricePerShare) : undefined,
+        moneyRaised: moneyRaised && moneyRaised.trim() ? parseFloat(moneyRaised) : undefined,
+        valuationCap: valuationCap && valuationCap.trim() ? parseFloat(valuationCap) : undefined,
+        investmentAmount: investmentAmount && investmentAmount.trim() ? parseFloat(investmentAmount) : undefined,
+        authorizedShares: authorizedShares && authorizedShares.trim() ? parseInt(authorizedShares) : undefined,
+        date: (date && date.trim()) || new Date().toISOString().split('T')[0],
+        color: (color && color.trim()) || '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
         allocations: []
       });
     }
