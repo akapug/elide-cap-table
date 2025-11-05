@@ -1,5 +1,32 @@
 // CSV Import/Export functionality
 
+// Helper function to parse a CSV line (handles quoted fields)
+function parseLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      cells.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current);
+
+  return cells;
+}
+
 export function exportToCSV(capTable, allScenarios = null) {
   // If allScenarios provided, export multi-scenario CSV
   if (allScenarios && allScenarios.length > 1) {
@@ -220,11 +247,22 @@ export function parseCSV(csvText) {
     throw new Error('CSV file is empty or invalid');
   }
 
+  // Check if this is a multi-scenario export
+  if (lines[0].startsWith('# MULTI-SCENARIO')) {
+    return parseMultiScenarioCSV(lines);
+  }
+
+  // Single scenario import
+  return parseSingleScenario(lines, 0);
+}
+
+// Parse a single scenario from lines starting at startIndex
+function parseSingleScenario(lines, startIndex) {
   let companyName = 'My Company';
-  let currentLine = 0;
+  let currentLine = startIndex;
 
   // Parse metadata if present
-  if (lines[0].startsWith('# METADATA') || lines[0].startsWith('# MULTI-SCENARIO')) {
+  if (lines[currentLine].startsWith('# METADATA') || lines[currentLine].startsWith('# SCENARIO:')) {
     currentLine++;
     while (currentLine < lines.length && !lines[currentLine].startsWith('Round Name')) {
       const cells = parseLine(lines[currentLine]);
@@ -251,6 +289,11 @@ export function parseCSV(csvText) {
 
   for (; currentLine < lines.length; currentLine++) {
     const line = lines[currentLine];
+
+    // Stop at next scenario marker
+    if (line.startsWith('# SCENARIO:')) {
+      break;
+    }
 
     // Skip section markers and blank lines
     if (line.startsWith('#') || !line.trim()) {
@@ -317,31 +360,41 @@ export function parseCSV(csvText) {
   };
 }
 
-// Helper function to parse a CSV line (handles quoted fields)
-function parseLine(line) {
-  const cells = [];
-  let current = '';
-  let inQuotes = false;
+// Parse multi-scenario CSV
+function parseMultiScenarioCSV(lines) {
+  const scenarios = [];
+  let currentLine = 0;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
+  // Skip global metadata
+  while (currentLine < lines.length && !lines[currentLine].startsWith('# SCENARIO:')) {
+    currentLine++;
+  }
+
+  // Parse each scenario
+  while (currentLine < lines.length) {
+    if (lines[currentLine].startsWith('# SCENARIO:')) {
+      const scenarioName = lines[currentLine].substring(12).trim(); // Remove "# SCENARIO: "
+      const scenarioData = parseSingleScenario(lines, currentLine);
+
+      scenarios.push({
+        name: scenarioName,
+        data: scenarioData
+      });
+
+      // Find next scenario or end
+      currentLine++;
+      while (currentLine < lines.length && !lines[currentLine].startsWith('# SCENARIO:')) {
+        currentLine++;
       }
-    } else if (char === ',' && !inQuotes) {
-      cells.push(current);
-      current = '';
     } else {
-      current += char;
+      currentLine++;
     }
   }
-  cells.push(current);
 
-  return cells;
+  return {
+    isMultiScenario: true,
+    scenarios: scenarios
+  };
 }
 
 export function downloadCSVTemplate() {

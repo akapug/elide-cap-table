@@ -152,8 +152,7 @@ function initEventListeners() {
   });
 
   // CSV import/export
-  document.getElementById("export-csv").addEventListener("click", () => exportToCSV(capTable));
-  document.getElementById("export-all-scenarios").addEventListener("click", exportAllScenarios);
+  document.getElementById("export-csv").addEventListener("click", handleCSVExport);
   document.getElementById("import-csv").addEventListener("click", () => {
     document.getElementById("csv-file-input").click();
   });
@@ -258,21 +257,53 @@ function handleCSVImport(event) {
     try {
       const importedData = parseCSV(e.target.result);
 
-      // parseCSV now returns { companyName, rounds }
-      const rounds = importedData.rounds || importedData;
-      const companyName = importedData.companyName || capTable.companyName;
+      // Check if multi-scenario import
+      if (importedData.isMultiScenario) {
+        const scenarios = importedData.scenarios;
+        const firstScenario = scenarios[0];
 
-      if (confirm(`Import ${rounds.length} rounds? This will replace existing rounds.`)) {
-        capTable.rounds = rounds;
-        capTable.companyName = companyName;
-        document.getElementById("company-name").textContent = companyName;
-        document.getElementById("input-company-name").value = companyName;
+        if (!confirm(`Import ${scenarios.length} scenarios? First scenario will be current data, others will be saved scenarios.`)) {
+          return;
+        }
+
+        // Import first scenario as current
+        capTable.rounds = firstScenario.data.rounds;
+        capTable.companyName = firstScenario.data.companyName;
+        document.getElementById("company-name").textContent = capTable.companyName;
+        document.getElementById("input-company-name").value = capTable.companyName;
         await saveData();
+
+        // Save remaining scenarios
+        const savedScenarios = {};
+        for (let i = 1; i < scenarios.length; i++) {
+          const scenario = scenarios[i];
+          savedScenarios[scenario.name] = JSON.stringify(scenario.data);
+        }
+        localStorage.setItem("scenarios", JSON.stringify(savedScenarios));
+
+        ScenarioManager.loadScenariosList();
         renderRoundsList();
         updateStats();
         updateLegend();
         renderTreemap();
-        alert('Import successful!');
+        alert(`Import successful! ${scenarios.length} scenarios imported.`);
+      } else {
+        // Single scenario import
+        const rounds = importedData.rounds;
+        const companyName = importedData.companyName || capTable.companyName;
+
+        if (confirm(`Import ${rounds.length} rounds? This will replace existing rounds.`)) {
+          capTable.rounds = rounds;
+          capTable.companyName = companyName;
+          document.getElementById("company-name").textContent = companyName;
+          document.getElementById("input-company-name").value = companyName;
+          await saveData();
+          renderRoundsList();
+          updateStats();
+          updateLegend();
+          renderTreemap();
+          alert('Import successful!');
+        }
       }
     } catch (error) {
       alert('Error importing CSV: ' + error.message);
@@ -284,32 +315,35 @@ function handleCSVImport(event) {
   event.target.value = '';
 }
 
-// Export all scenarios to a single CSV
-function exportAllScenarios() {
+// Smart CSV export - automatically includes all scenarios if they exist
+function handleCSVExport() {
   const scenarios = ScenarioManager.getAllScenarios();
-  const scenarioList = [];
+  const scenarioKeys = Object.keys(scenarios);
 
-  // Add current live data
-  scenarioList.push({
-    name: 'Current (Live Data)',
-    data: capTable
-  });
+  // If there are saved scenarios, export all of them together
+  if (scenarioKeys.length > 0) {
+    const scenarioList = [];
 
-  // Add all saved scenarios
-  Object.keys(scenarios).forEach(name => {
+    // Add current live data
     scenarioList.push({
-      name: name,
-      data: JSON.parse(scenarios[name])
+      name: 'Current (Live Data)',
+      data: capTable
     });
-  });
 
-  if (scenarioList.length === 1) {
-    alert('No saved scenarios to export. Only current data exists.');
-    return;
+    // Add all saved scenarios
+    scenarioKeys.forEach(name => {
+      scenarioList.push({
+        name: name,
+        data: JSON.parse(scenarios[name])
+      });
+    });
+
+    // Export multi-scenario CSV
+    exportToCSV(capTable, scenarioList);
+  } else {
+    // Just export current data
+    exportToCSV(capTable);
   }
-
-  // Call exportToCSV with all scenarios
-  exportToCSV(capTable, scenarioList);
 }
 
 // View mode
