@@ -153,6 +153,7 @@ function initEventListeners() {
 
   // CSV import/export
   document.getElementById("export-csv").addEventListener("click", () => exportToCSV(capTable));
+  document.getElementById("export-all-scenarios").addEventListener("click", exportAllScenarios);
   document.getElementById("import-csv").addEventListener("click", () => {
     document.getElementById("csv-file-input").click();
   });
@@ -255,10 +256,17 @@ function handleCSVImport(event) {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      const rounds = parseCSV(e.target.result);
+      const importedData = parseCSV(e.target.result);
+
+      // parseCSV now returns { companyName, rounds }
+      const rounds = importedData.rounds || importedData;
+      const companyName = importedData.companyName || capTable.companyName;
 
       if (confirm(`Import ${rounds.length} rounds? This will replace existing rounds.`)) {
         capTable.rounds = rounds;
+        capTable.companyName = companyName;
+        document.getElementById("company-name").textContent = companyName;
+        document.getElementById("input-company-name").value = companyName;
         await saveData();
         renderRoundsList();
         updateStats();
@@ -274,6 +282,34 @@ function handleCSVImport(event) {
 
   // Reset input
   event.target.value = '';
+}
+
+// Export all scenarios to a single CSV
+function exportAllScenarios() {
+  const scenarios = ScenarioManager.getAllScenarios();
+  const scenarioList = [];
+
+  // Add current live data
+  scenarioList.push({
+    name: 'Current (Live Data)',
+    data: capTable
+  });
+
+  // Add all saved scenarios
+  Object.keys(scenarios).forEach(name => {
+    scenarioList.push({
+      name: name,
+      data: JSON.parse(scenarios[name])
+    });
+  });
+
+  if (scenarioList.length === 1) {
+    alert('No saved scenarios to export. Only current data exists.');
+    return;
+  }
+
+  // Call exportToCSV with all scenarios
+  exportToCSV(capTable, scenarioList);
 }
 
 // View mode
