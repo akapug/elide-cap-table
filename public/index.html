@@ -100,15 +100,6 @@
     }
 
     /* Breadcrumb */
-    #breadcrumb {
-      background: #1e293b;
-      padding: 0.75rem 2rem;
-      border-bottom: 1px solid #334155;
-      font-size: 0.875rem;
-      color: #94a3b8;
-      flex-shrink: 0;
-    }
-
     #breadcrumb span {
       cursor: pointer;
       transition: color 0.2s;
@@ -487,18 +478,20 @@
 <body>
   <div id="app">
     <header>
-      <h1 id="company-name">Cap Table Visualizer</h1>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <h1 id="company-name">Cap Table Visualizer</h1>
+        <div id="breadcrumb" style="font-size: 0.875rem; color: #94a3b8;">
+          <span data-path="">Overview</span>
+        </div>
+      </div>
       <div class="controls">
+        <button id="legal-disclaimer" class="secondary" title="View legal disclaimer">⚖️ Legal</button>
         <button id="toggle-stats">Stats</button>
         <button id="toggle-sidebar">Edit Data</button>
         <button id="reset-zoom" class="secondary" title="Keyboard: R">Reset Zoom</button>
         <button id="keyboard-help" class="secondary" title="Show keyboard shortcuts" style="padding: 0.5rem 0.75rem;">⌨️</button>
       </div>
     </header>
-
-    <div id="breadcrumb">
-      <span data-path="">Overview</span>
-    </div>
 
     <main>
       <div id="treemap-container">
@@ -818,6 +811,60 @@
       </div>
       <div class="modal-footer">
         <button id="keyboard-shortcuts-done" class="secondary">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legal Disclaimer Modal -->
+  <div id="legal-disclaimer-modal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h2>⚖️ Legal Disclaimer</h2>
+        <button class="modal-close" id="legal-disclaimer-close">&times;</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.6;">
+        <p style="margin-bottom: 1rem; font-weight: 600; color: #f59e0b;">
+          This cap table visualization is for informational purposes only and does not constitute legal, financial, or tax advice.
+        </p>
+
+        <h3 style="font-size: 1rem; font-weight: 600; margin: 1.5rem 0 0.5rem 0; color: #f1f5f9;">Valuation Estimates</h3>
+        <p style="margin-bottom: 1rem;">
+          Estimated values shown for allocations are calculated using the following assumptions:
+        </p>
+        <ul style="margin: 0 0 1rem 1.5rem; padding: 0;">
+          <li style="margin-bottom: 0.5rem;">
+            <strong>Priced Rounds:</strong> Values are calculated using the actual price per share from the round.
+          </li>
+          <li style="margin-bottom: 0.5rem;">
+            <strong>SAFE Notes & Pre-Priced Rounds:</strong> Values are estimated by assuming conversion at a price equal to or above the highest SAFE valuation cap in the cap table. This is a simplified assumption and actual conversion prices may differ significantly based on future financing terms, discounts, and other factors.
+          </li>
+          <li style="margin-bottom: 0.5rem;">
+            <strong>Unallocated Shares:</strong> Values for unallocated portions of equity pools and rounds are estimated using the same pricing assumptions as allocated shares.
+          </li>
+        </ul>
+
+        <h3 style="font-size: 1rem; font-weight: 600; margin: 1.5rem 0 0.5rem 0; color: #f1f5f9;">Important Notes</h3>
+        <ul style="margin: 0 0 1rem 1.5rem; padding: 0;">
+          <li style="margin-bottom: 0.5rem;">
+            Actual valuations may vary significantly from estimates shown.
+          </li>
+          <li style="margin-bottom: 0.5rem;">
+            This tool does not account for liquidation preferences, participation rights, or other complex terms that may affect actual distributions.
+          </li>
+          <li style="margin-bottom: 0.5rem;">
+            Fully diluted percentages assume all authorized shares are issued, which may not reflect actual ownership percentages.
+          </li>
+          <li style="margin-bottom: 0.5rem;">
+            Always consult with qualified legal and financial advisors before making any decisions based on this information.
+          </li>
+        </ul>
+
+        <p style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #374151; font-size: 0.875rem; opacity: 0.8;">
+          By using this tool, you acknowledge that you understand these limitations and will not rely solely on this information for legal, financial, or investment decisions.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button id="legal-disclaimer-done" class="secondary">I Understand</button>
       </div>
     </div>
   </div>

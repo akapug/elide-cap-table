@@ -39,6 +39,11 @@ function initEventListeners() {
   document.getElementById("keyboard-shortcuts-close").addEventListener("click", closeKeyboardShortcutsModal);
   document.getElementById("keyboard-shortcuts-done").addEventListener("click", closeKeyboardShortcutsModal);
 
+  // Legal disclaimer modal
+  document.getElementById("legal-disclaimer").addEventListener("click", openLegalDisclaimerModal);
+  document.getElementById("legal-disclaimer-close").addEventListener("click", closeLegalDisclaimerModal);
+  document.getElementById("legal-disclaimer-done").addEventListener("click", closeLegalDisclaimerModal);
+
   // Round modal
   document.getElementById("round-modal-close").addEventListener("click", closeRoundModal);
   document.getElementById("round-cancel").addEventListener("click", closeRoundModal);
@@ -440,6 +445,16 @@ function openKeyboardShortcutsModal() {
 // Close keyboard shortcuts modal
 function closeKeyboardShortcutsModal() {
   document.getElementById("keyboard-shortcuts-modal").classList.remove("visible");
+}
+
+// Open legal disclaimer modal
+function openLegalDisclaimerModal() {
+  document.getElementById("legal-disclaimer-modal").classList.add("visible");
+}
+
+// Close legal disclaimer modal
+function closeLegalDisclaimerModal() {
+  document.getElementById("legal-disclaimer-modal").classList.remove("visible");
 }
 
 // Update legend
