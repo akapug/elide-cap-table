@@ -272,13 +272,16 @@ function exportMultiScenarioCSV(scenarios) {
 }
 
 export function parseCSV(csvText) {
-  const lines = csvText.split('\n').filter(line => line.trim());
+  // Normalize BOM and newlines (handle CRLF and stray CR)
+  const normalized = (csvText || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n').filter(line => line.trim());
   if (lines.length < 2) {
     throw new Error('CSV file is empty or invalid');
   }
 
-  // Check if this is a multi-scenario export
-  if (lines[0].startsWith('# MULTI-SCENARIO')) {
+  // Check if this is a multi-scenario export (look at first cell only)
+  const firstCell = parseLine(lines[0])[0] || '';
+  if (firstCell.startsWith('# MULTI-SCENARIO')) {
     return parseMultiScenarioCSV(lines);
   }
 
@@ -291,10 +294,13 @@ function parseSingleScenario(lines, startIndex) {
   let companyName = 'My Company';
   let currentLine = startIndex;
 
-  // Parse metadata if present
-  if (lines[currentLine].startsWith('# METADATA') || lines[currentLine].startsWith('# SCENARIO:')) {
+  // Parse metadata if present (header lines might have trailing commas)
+  const firstMetaCell = parseLine(lines[currentLine])[0] || '';
+  if (firstMetaCell.startsWith('# METADATA') || firstMetaCell.startsWith('# SCENARIO:')) {
     currentLine++;
-    while (currentLine < lines.length && !lines[currentLine].startsWith('Round Name')) {
+    while (currentLine < lines.length) {
+      const cell0 = (parseLine(lines[currentLine])[0] || '');
+      if (cell0 === 'Round Name') break;
       const cells = parseLine(lines[currentLine]);
       if (cells[0] === 'Company Name' && cells[1]) {
         companyName = cells[1];
@@ -303,8 +309,8 @@ function parseSingleScenario(lines, startIndex) {
     }
   }
 
-  // Find header line
-  while (currentLine < lines.length && !lines[currentLine].startsWith('Round Name')) {
+  // Find header line (first cell equals 'Round Name')
+  while (currentLine < lines.length && (parseLine(lines[currentLine])[0] || '') !== 'Round Name') {
     currentLine++;
   }
 
@@ -407,8 +413,10 @@ function parseMultiScenarioCSV(lines) {
 
   // Parse each scenario
   while (currentLine < lines.length) {
-    if (lines[currentLine].startsWith('# SCENARIO:')) {
-      const scenarioName = lines[currentLine].substring(12).trim(); // Remove "# SCENARIO: "
+    const cell0 = (parseLine(lines[currentLine])[0] || '');
+    if (cell0.startsWith('# SCENARIO:')) {
+      // Extract name from the first cell only to avoid trailing commas from Excel/Notepad++
+      const scenarioName = cell0.replace(/^#\s*SCENARIO:\s*/, '').trim();
       const scenarioData = parseSingleScenario(lines, currentLine);
 
       scenarios.push({
@@ -418,7 +426,7 @@ function parseMultiScenarioCSV(lines) {
 
       // Find next scenario or end
       currentLine++;
-      while (currentLine < lines.length && !lines[currentLine].startsWith('# SCENARIO:')) {
+      while (currentLine < lines.length && !(parseLine(lines[currentLine])[0] || '').startsWith('# SCENARIO:')) {
         currentLine++;
       }
     } else {
