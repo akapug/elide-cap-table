@@ -3,3 +3,7 @@ node_modules/
 *.log
 .elide/
 
+
+# Ignore cap table CSV exports (user/company data)
+*_cap_table_*.csv
+/Elide Technologies, Inc._cap_table_*.csv

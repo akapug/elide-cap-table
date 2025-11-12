@@ -287,6 +287,8 @@ function handleCSVImport(event) {
         updateLegend();
         renderTreemap();
         alert(`Import successful! ${scenarios.length} scenarios imported.`);
+        // Show non-blocking chronology warnings post-import
+        showChronologyWarnings();
       } else {
         // Single scenario import
         const rounds = importedData.rounds;
@@ -303,6 +305,8 @@ function handleCSVImport(event) {
           updateLegend();
           renderTreemap();
           alert('Import successful!');
+          // Show non-blocking chronology warnings post-import
+          showChronologyWarnings();
         }
       }
     } catch (error) {
@@ -402,10 +406,9 @@ async function saveData() {
 
 // Calculate effective price per share based on latest round
 function getEffectivePricePerShare() {
-  const totalIssued = capTable.rounds.reduce(
-    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
-    0
-  );
+  const totalIssued = capTable.rounds
+    .filter(r => r.type !== 'safe' || r.converted)
+    .reduce((sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0), 0);
 
   // Find the most recent priced round
   const pricedRounds = capTable.rounds.filter(r => r.type === 'priced' && r.pricePerShare);
@@ -453,12 +456,119 @@ function calculateFullyDilutedShares() {
   return fullyDiluted;
 }
 
+// If there are no priced rounds left, revert any SAFE conversions back to as-if shares
+function revertSAFEConversionsIfNoPricedRounds() {
+  const hasPriced = capTable.rounds.some(r => r.type === 'priced');
+  if (hasPriced) return false;
+
+  // Base for SAFE as-if shares = non-SAFE issued shares PLUS authorized equity pool
+  const nonPoolIssued = capTable.rounds
+    .filter(r => r.type !== 'safe' && r.type !== 'equity-pool')
+    .reduce((sum, r) => sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0);
+  const poolAuthorized = capTable.rounds
+    .filter(r => r.type === 'equity-pool')
+    .reduce((sum, r) => sum + (r.authorizedShares || 0), 0);
+  const baseCapShares = nonPoolIssued + poolAuthorized;
+
+  let changed = false;
+  capTable.rounds.forEach(r => {
+    if (r.type === 'safe' && r.converted) {
+      r.allocations = r.allocations.map(a => {
+        const invest = a.investmentAmount || 0;
+        const recalculated = Math.round((invest / (r.valuationCap || 1)) * baseCapShares);
+        return {
+          ...a,
+          shares: recalculated,
+          conversionPrice: undefined,
+          convertedFrom: undefined,
+          originalShares: undefined,
+        };
+      });
+      r.converted = false;
+      r.conversionPrice = undefined;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+
+// Chronology warnings helpers (non-blocking)
+function gatherChronologyWarnings(cap) {
+  const warnings = [];
+  if (!cap || !Array.isArray(cap.rounds)) return warnings;
+  const rounds = cap.rounds;
+
+  // Flag CSV-defaulted or missing dates
+  rounds.forEach(r => {
+    if (r && r.autoDateAssigned) {
+      warnings.push(`CSV missing date on "${r.name}" — defaulted to today; chronology may be inaccurate.`);
+    } else if (r && !r.date) {
+      warnings.push(`Missing date on "${r.name}".`);
+    }
+  });
+
+  const priced = rounds.filter(r => r.type === 'priced');
+  const safes = rounds.filter(r => r.type === 'safe');
+  const pools = rounds.filter(r => r.type === 'equity-pool');
+  const nonPoolNonSafe = rounds.filter(r => r.type !== 'equity-pool' && r.type !== 'safe' && r.type !== 'priced');
+
+  priced.forEach(p => {
+    const pd = (p && p.date) || '';
+    // SAFEs dated after the priced round
+    safes.forEach(s => {
+      const sd = (s && s.date) || '';
+      if (sd && pd && sd > pd) {
+        warnings.push(`SAFE "${s.name}" (${sd}) occurs after priced "${p.name}" (${pd}) but will still convert.`);
+      }
+    });
+    // Pools authorized after the priced round (still included in our pre-money base)
+    pools.forEach(pool => {
+      const qd = (pool && pool.date) || '';
+      if (qd && pd && qd > pd && (pool.authorizedShares || 0) > 0) {
+        warnings.push(`Equity pool "${pool.name}" (${qd}) is dated after "${p.name}" (${pd}) but is included in pre-money base.`);
+      }
+    });
+    // Other issued rounds after the priced round
+    nonPoolNonSafe.forEach(r => {
+      const rd = (r && r.date) || '';
+      if (rd && pd && rd > pd) {
+        warnings.push(`Issued round "${r.name}" (${rd}) occurs after priced "${p.name}" (${pd}) but is counted in pre-money base.`);
+      }
+    });
+  });
+
+  return warnings;
+}
+
+function showChronologyWarnings() {
+  try {
+    const warnings = gatherChronologyWarnings(capTable);
+    const digest = warnings.slice(0).sort().join('|');
+    if (!warnings.length) {
+      window._lastChronologyWarningsDigest = digest;
+      return;
+    }
+    if (window._lastChronologyWarningsDigest === digest) return; // avoid repeat spam
+    window._lastChronologyWarningsDigest = digest;
+
+    const maxShow = 8;
+    const lines = warnings.slice(0, maxShow);
+    const more = warnings.length - lines.length;
+    let msg = 'Heads up: chronology warnings (non-blocking):\n\n' + lines.map(w => '• ' + w).join('\n');
+    if (more > 0) msg += `\n…and ${more} more.`;
+    alert(msg);
+  } catch (e) {
+    // no-op
+  }
+}
+
+
 // Update statistics
 function updateStats() {
-  const totalIssued = capTable.rounds.reduce(
-    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
-    0
-  );
+  const totalIssued = capTable.rounds
+    .filter(r => r.type !== 'safe' || r.converted)
+    .reduce((sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0), 0);
   const fullyDiluted = calculateFullyDilutedShares();
 
   // Auto-calculate authorized shares: fully diluted + 20% buffer for future rounds
@@ -490,6 +600,7 @@ function updateStats() {
   window._effectivePricePerShare = effectivePricePerShare;
   window._fullyDilutedShares = fullyDiluted;
   window._authorizedShares = authorized;
+  window._totalIssuedShares = totalIssued;
 }
 
 // Toggle stats modal
@@ -911,6 +1022,14 @@ function toggleRoundTypeFields() {
     investmentGroup.style.display = "none";
     poolAuthorizedGroup.style.display = "block";
     dilutionPreview.style.display = "none";
+  } else if (type === "common") {
+    // Common (founder/employee issued) – no price/money raised/authorized inputs
+    priceGroup.style.display = "none";
+    moneyRaisedGroup.style.display = "none";
+    capGroup.style.display = "none";
+    investmentGroup.style.display = "none";
+    poolAuthorizedGroup.style.display = "none";
+    dilutionPreview.style.display = "none";
   } else {
     // Priced round
     priceGroup.style.display = "block";
@@ -980,7 +1099,15 @@ function openRoundModal(roundId = null) {
     const round = capTable.rounds.find((r) => r.id === roundId);
     title.textContent = "Edit Round";
     document.getElementById("round-name").value = round.name;
-    document.getElementById("round-type").value = round.type || "priced";
+    // Prefer explicit type; if missing, infer 'common' for founder/common rounds with no pricing
+    const inferredType = round.type || (
+      (!round.pricePerShare && !round.moneyRaised && (!round.valuationCap && !round.investmentAmount)) ? 'common' : 'priced'
+    );
+    const typeSelect = document.getElementById("round-type");
+    typeSelect.value = inferredType;
+    // Ensure selected flag is applied (avoids stale default selection)
+    Array.from(typeSelect.options).forEach(o => { o.selected = (o.value === inferredType); });
+
     document.getElementById("round-price").value = round.pricePerShare || "";
     document.getElementById("round-money-raised").value = round.moneyRaised || "";
     document.getElementById("round-valuation-cap").value = round.valuationCap || "";
@@ -1123,7 +1250,7 @@ async function saveRound() {
       conversions.forEach(c => {
         summary += `${c.holderName} (${c.roundName}):\n`;
         summary += `  Investment: ${formatCurrency(c.investmentAmount)}\n`;
-        summary += `  Conversion Price: ${formatCurrency(c.conversionPrice)}/share\n`;
+        summary += `  Conversion Price: $${c.conversionPrice.toFixed(c.conversionPrice >= 1 ? 2 : 4)}/share\n`;
         summary += `  Shares: ${c.originalShares.toLocaleString()} → ${c.convertedShares.toLocaleString()}\n`;
         if (c.discount > 0) {
           summary += `  Discount: ${c.discount.toFixed(1)}%\n`;
@@ -1134,10 +1261,15 @@ async function saveRound() {
     }
   }
 
+  // If we ended up with no priced rounds, revert any SAFE conversions
+  revertSAFEConversionsIfNoPricedRounds();
+
   await saveData();
   renderRoundsList();
   updateLegend();
   renderTreemap();
+  // Show non-blocking chronology warnings after changes
+  showChronologyWarnings();
   closeRoundModal();
 }
 
@@ -1145,6 +1277,10 @@ async function deleteRound(roundId) {
   if (!confirm("Delete this round and all its allocations?")) return;
 
   capTable.rounds = capTable.rounds.filter((r) => r.id !== roundId);
+
+  // If this removal leaves no priced rounds, revert SAFE conversions
+  revertSAFEConversionsIfNoPricedRounds();
+
   await saveData();
   renderRoundsList();
   updateLegend();
@@ -1346,10 +1482,9 @@ function updateOfferCalculator() {
   }
 
   const shares = parseFloat(sharesInput);
-  const totalIssued = capTable.rounds.reduce(
-    (sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0),
-    0
-  );
+  const totalIssued = capTable.rounds
+    .filter(r => r.type !== 'safe' || r.converted)
+    .reduce((sum, round) => sum + round.allocations.reduce((s, a) => s + a.shares, 0), 0);
   const fullyDiluted = calculateFullyDilutedShares();
   const effectivePrice = window._effectivePricePerShare || 0;
 
@@ -1405,16 +1540,19 @@ async function saveAllocation() {
       return;
     }
     // Calculate ownership percentage: investment / valuation cap
-    // Then apply to total issued shares (excluding this SAFE round to avoid circular dependency)
+    // Apply to capitalization base used for cap conversion: non-SAFE issued + authorized pool
     const ownershipPercent = investmentAmount / round.valuationCap;
 
-    // Total issued shares excluding ALL SAFE rounds (since they don't have fixed shares yet)
-    const totalIssuedExcludingSAFEs = capTable.rounds
-      .filter(r => r.type !== 'safe')
+    const nonPoolIssuedExclSafes = capTable.rounds
+      .filter(r => (r.type !== 'safe' || r.converted) && r.type !== 'equity-pool')
       .reduce((sum, r) => sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0);
+    const poolAuthorized = capTable.rounds
+      .filter(r => r.type === 'equity-pool')
+      .reduce((sum, r) => sum + (r.authorizedShares || 0), 0);
+    const baseCapShares = nonPoolIssuedExclSafes + poolAuthorized;
 
-    // Apply ownership % to the non-SAFE issued shares
-    shares = Math.round(ownershipPercent * totalIssuedExcludingSAFEs);
+    // Apply ownership % to the capitalization base
+    shares = Math.round(ownershipPercent * baseCapShares);
   } else {
     shares = parseInt(sharesStr);
     if (isNaN(shares) || shares <= 0) {

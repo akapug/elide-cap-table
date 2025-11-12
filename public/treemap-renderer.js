@@ -295,12 +295,14 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
     .style("pointer-events", "none")
     .style("user-select", "none"); // Prevent text selection on click
 
-  // Calculate total shares for ownership % from the hierarchy (total issued shares)
-  const totalShares = hierarchy.value;
-  const fullyDiluted = window._fullyDilutedShares || totalShares;
+  // Calculate issued shares (exclude unallocated and SAFEs)
+  const issuedTotalShares = hierarchy.leaves()
+    .filter((n) => !n.data.isUnallocated && n.parent && (n.parent.data.roundType !== 'safe' || n.parent.data.converted))
+    .reduce((sum, n) => sum + n.data.shares, 0);
+  const fullyDiluted = window._fullyDilutedShares || issuedTotalShares;
 
-  // Store totalShares globally for tooltip calculations
-  window._totalIssuedShares = totalShares;
+  // Store issued total globally for tooltip calculations
+  window._totalIssuedShares = issuedTotalShares;
 
   // Add ownership % for rounds (second line) - show fully diluted by default
   leaf
@@ -312,8 +314,19 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
       const width = d.x1 - d.x0;
       const height = d.y1 - d.y0;
       if (width > 60 && height > 35 && viewMode === "shares") {
-        const fdOwnership = (d.value / fullyDiluted) * 100;
-        const issuedOwnership = (d.value / totalShares) * 100;
+        // Compute round FD and issued shares correctly
+        let roundFDShares;
+        if (d.data.roundType === 'equity-pool') {
+          roundFDShares = d.value; // includes unallocated pool
+        } else {
+          roundFDShares = (d.children || []).filter(c => !c.data.isUnallocated).reduce((sum, c) => sum + c.data.shares, 0);
+        }
+        const fdOwnership = fullyDiluted > 0 ? (roundFDShares / fullyDiluted) * 100 : 0;
+
+        const roundIssuedShares = (d.data.roundType === 'safe' && !d.data.converted)
+          ? 0
+          : (d.children || []).filter(c => !c.data.isUnallocated).reduce((sum, c) => sum + c.data.shares, 0);
+        const issuedOwnership = issuedTotalShares > 0 ? (roundIssuedShares / issuedTotalShares) * 100 : 0;
         // Show fully diluted, with issued in parentheses if different
         if (Math.abs(fdOwnership - issuedOwnership) > 0.01) {
           return `${fdOwnership.toFixed(2)}% FD (${issuedOwnership.toFixed(2)}% issued)`;
@@ -513,10 +526,14 @@ function capTableToTree(capTable, mode) {
       if (remainingCapacity > 0 && round.valuationCap) {
         // Calculate shares for unallocated portion using same formula as allocations
         const ownershipPercent = remainingCapacity / round.valuationCap;
-        const totalIssuedExcludingSAFEs = capTable.rounds
-          .filter(r => r.type !== 'safe')
+        const nonPoolIssued = capTable.rounds
+          .filter(r => r.type !== 'safe' && r.type !== 'equity-pool')
           .reduce((sum, r) => sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0);
-        const unallocatedShares = Math.round(ownershipPercent * totalIssuedExcludingSAFEs);
+        const poolAuthorized = capTable.rounds
+          .filter(r => r.type === 'equity-pool')
+          .reduce((sum, r) => sum + (r.authorizedShares || 0), 0);
+        const baseCapShares = nonPoolIssued + poolAuthorized;
+        const unallocatedShares = Math.round(ownershipPercent * baseCapShares);
 
         roundChildren.push({
           name: "Unallocated",
@@ -558,6 +575,7 @@ function capTableToTree(capTable, mode) {
       round: round.name,
       roundColor: round.color,
       roundType: round.type,
+      converted: !!round.converted,
       value: 0,
       children: roundChildren,
     };
@@ -580,11 +598,15 @@ function createTooltipHTML(d, capTable, viewMode) {
     lines.push(`<div style="font-weight: bold; margin-bottom: 4px;">${d.data.name}</div>`);
     lines.push(`<div>Round: ${d.data.name}</div>`);
 
-    const totalShares = d.children ? d.children.reduce((sum, c) => sum + c.data.shares, 0) : 0;
-    lines.push(`<div>Shares: ${formatNumber(totalShares)}</div>`);
+    const allocatedShares = d.children ? d.children.filter(c => !c.data.isUnallocated).reduce((sum, c) => sum + c.data.shares, 0) : 0;
+    const totalRoundShares = d.children ? d.children.reduce((sum, c) => sum + c.data.shares, 0) : 0;
+    const displayShares = d.data.roundType === 'equity-pool' ? totalRoundShares : allocatedShares;
+    lines.push(`<div>Shares: ${formatNumber(displayShares)}</div>`);
 
-    const fdOwnership = ((totalShares / fullyDiluted) * 100).toFixed(4);
-    const issuedOwnership = ((totalShares / totalIssued) * 100).toFixed(2);
+    const roundFDShares = d.data.roundType === 'equity-pool' ? totalRoundShares : allocatedShares;
+    const fdOwnership = ((roundFDShares / fullyDiluted) * 100).toFixed(4);
+    const roundIssuedShares = (d.data.roundType === 'safe' && !d.data.converted) ? 0 : allocatedShares;
+    const issuedOwnership = ((roundIssuedShares / totalIssued) * 100).toFixed(2);
     lines.push(`<div style="font-weight: bold;">${fdOwnership}% fully diluted</div>`);
     if (Math.abs(parseFloat(fdOwnership) - parseFloat(issuedOwnership)) > 0.01) {
       lines.push(`<div style="opacity: 0.8; font-size: 11px;">(${issuedOwnership}% of issued)</div>`);
@@ -603,7 +625,8 @@ function createTooltipHTML(d, capTable, viewMode) {
     lines.push(`<div>Shares: ${formatNumber(d.data.shares)}</div>`);
 
     const fdOwnership = ((d.data.shares / fullyDiluted) * 100).toFixed(4);
-    const issuedOwnership = ((d.data.shares / totalIssued) * 100).toFixed(4);
+    const isSafe = d.parent && d.parent.data && d.parent.data.roundType === 'safe' && !d.parent.data.converted;
+    const issuedOwnership = isSafe ? '0.0000' : ((d.data.shares / totalIssued) * 100).toFixed(4);
     lines.push(`<div style="font-weight: bold;">${fdOwnership}% fully diluted</div>`);
     if (Math.abs(parseFloat(fdOwnership) - parseFloat(issuedOwnership)) > 0.01) {
       lines.push(`<div style="opacity: 0.8; font-size: 11px;">(${issuedOwnership}% of issued)</div>`);

@@ -27,6 +27,36 @@ function parseLine(line) {
   return cells;
 }
 
+// Normalize/robustly infer round type from CSV
+function normalizeRoundType(rt, name, authorizedShares) {
+  const raw = (rt || '').trim().toLowerCase();
+  const nameLower = (name || '').toLowerCase();
+  const auth = typeof authorizedShares === 'number' ? authorizedShares : undefined;
+
+  // Common synonyms map
+  if (raw === 'equity pool') return 'equity-pool';
+  if (raw === 'option pool' || raw === 'pool' || raw === 'esop') return 'equity-pool';
+  if (raw === 'common' || raw === 'common stock' || raw === 'founder' || raw === 'founder common' || raw === 'founder common stock') {
+    return 'common';
+  }
+
+  if (raw === 'safe' || raw === 'priced' || raw === 'equity-pool') {
+    // Guard: equity-pool rows without an authorized cap are almost certainly mislabeled
+    if (raw === 'equity-pool' && (!auth || isNaN(auth) || auth <= 0)) {
+      return 'priced';
+    }
+    return raw;
+  }
+
+  // Heuristic by name: treat as equity pool only if authorized shares provided
+  if ((nameLower.includes('equity') || nameLower.includes('plan') || nameLower.includes('option')) && auth && auth > 0) {
+    return 'equity-pool';
+  }
+
+  // Default to common (issued) – safest fallback
+  return 'common';
+}
+
 export function exportToCSV(capTable, allScenarios = null) {
   // If allScenarios provided, export multi-scenario CSV
   if (allScenarios && allScenarios.length > 1) {
@@ -66,7 +96,7 @@ export function exportToCSV(capTable, allScenarios = null) {
       // Round with no allocations
       rows.push([
         round.name,
-        round.type || 'priced',
+        round.type || 'common',
         round.pricePerShare || '',
         round.moneyRaised || '',
         round.valuationCap || '',
@@ -86,7 +116,7 @@ export function exportToCSV(capTable, allScenarios = null) {
       round.allocations.forEach(allocation => {
         rows.push([
           round.name,
-          round.type || 'priced',
+          round.type || 'common',
           round.pricePerShare || '',
           round.moneyRaised || '',
           round.valuationCap || '',
@@ -173,7 +203,7 @@ function exportMultiScenarioCSV(scenarios) {
       if (round.allocations.length === 0) {
         rows.push([
           round.name,
-          round.type || 'priced',
+          round.type || 'common',
           round.pricePerShare || '',
           round.moneyRaised || '',
           round.valuationCap || '',
@@ -192,7 +222,7 @@ function exportMultiScenarioCSV(scenarios) {
         round.allocations.forEach(allocation => {
           rows.push([
             round.name,
-            round.type || 'priced',
+            round.type || 'common',
             round.pricePerShare || '',
             round.moneyRaised || '',
             round.valuationCap || '',
@@ -324,17 +354,22 @@ function parseSingleScenario(lines, startIndex) {
 
     // Get or create round
     if (!roundsMap.has(roundName)) {
+      // Pre-parse numeric fields needed for normalization
+      const _authorizedParsed = authorizedShares && authorizedShares.trim() ? parseInt(authorizedShares) : undefined;
+      const _normalizedType = normalizeRoundType(roundType, roundName, _authorizedParsed);
+
       roundsMap.set(roundName, {
         id: 'round-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         name: roundName,
-        type: roundType || 'priced',
+        type: _normalizedType,
         pricePerShare: pricePerShare && pricePerShare.trim() ? parseFloat(pricePerShare) : undefined,
         moneyRaised: moneyRaised && moneyRaised.trim() ? parseFloat(moneyRaised) : undefined,
         valuationCap: valuationCap && valuationCap.trim() ? parseFloat(valuationCap) : undefined,
         investmentAmount: investmentAmount && investmentAmount.trim() ? parseFloat(investmentAmount) : undefined,
-        authorizedShares: authorizedShares && authorizedShares.trim() ? parseInt(authorizedShares) : undefined,
+        authorizedShares: _normalizedType === 'equity-pool' ? _authorizedParsed : undefined,
         date: (date && date.trim()) || new Date().toISOString().split('T')[0],
         color: (color && color.trim()) || '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
+        autoDateAssigned: !(date && date.trim()),
         allocations: []
       });
     }
@@ -404,8 +439,8 @@ export function downloadCSVTemplate() {
     ['Exported On', new Date().toISOString()],
     [''],
     ['Round Name', 'Round Type', 'Price Per Share', 'Money Raised', 'Valuation Cap', 'Investment Amount', 'Authorized Shares', 'Date', 'Color', 'Holder Name', 'Shares', 'Allocation Investment Amount', 'Allocation Type', 'Vesting Schedule', 'Notes'],
-    ['Common Shares', 'priced', '', '', '', '', '', '2020-01-01', '#3b82f6', 'Founder 1', '5000000', '', 'common', '', 'CEO'],
-    ['Common Shares', 'priced', '', '', '', '', '', '2020-01-01', '#3b82f6', 'Founder 2', '3000000', '', 'common', '', 'CTO'],
+    ['Common Shares', 'common', '', '', '', '', '', '2020-01-01', '#3b82f6', 'Founder 1', '5000000', '', 'common', '', 'CEO'],
+    ['Common Shares', 'common', '', '', '', '', '', '2020-01-01', '#3b82f6', 'Founder 2', '3000000', '', 'common', '', 'CTO'],
     ['Pre-Seed SAFE', 'safe', '', '', '10000000', '800000', '', '2023-01-01', '#10b981', 'Angel Investor 1', '400000', '400000', 'preferred', '', ''],
     ['Pre-Seed SAFE', 'safe', '', '', '10000000', '800000', '', '2023-01-01', '#10b981', 'Angel Investor 2', '400000', '400000', 'preferred', '', ''],
     ['2024 Equity Plan', 'equity-pool', '', '', '', '', '10000000', '2024-01-01', '#f59e0b', 'Employee 1', '500000', '', 'option', '4 year vest, 1 year cliff', ''],

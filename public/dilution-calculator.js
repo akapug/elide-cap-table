@@ -55,19 +55,26 @@ export function convertSAFEs(capTable, postMoneyValuation, pricePerShare) {
       return;
     }
 
-    // SAFE conversion formula:
-    // Conversion price = (valuation cap / post-money valuation) * price per share
-    // But it can't be higher than the price per share (no discount if cap > post-money)
-    const conversionDiscount = Math.min(1, round.valuationCap / postMoneyValuation);
-    const conversionPrice = conversionDiscount * pricePerShare;
+    // SAFE conversion price per share is the better of cap-based price and round price:
+    // capPrice = valuationCap / preMoneyCapShares; conversionPrice = Math.min(pricePerShare, capPrice)
+    // Where preMoneyCapShares includes non-SAFE issued shares PLUS authorized equity pool (market-standard capitalization base)
+    const nonPoolIssuedExclSafes = capTable.rounds
+      .filter(r => (r.type !== 'safe' || r.converted) && r.type !== 'equity-pool')
+      .reduce((sum, r) => sum + r.allocations.reduce((s, a) => s + a.shares, 0), 0);
+    const authorizedPool = capTable.rounds
+      .filter(r => r.type === 'equity-pool')
+      .reduce((sum, r) => sum + (r.authorizedShares || 0), 0);
+    const preMoneyCapShares = Math.max(nonPoolIssuedExclSafes + authorizedPool, 1);
+    const capPrice = round.valuationCap / preMoneyCapShares;
+    const conversionPrice = Math.min(pricePerShare, capPrice);
+    const conversionDiscount = Math.max(0, 1 - (conversionPrice / pricePerShare));
 
     const updatedAllocations = round.allocations.map(alloc => {
       // Use investment amount if available, otherwise estimate from shares and cap
       let investmentAmount = alloc.investmentAmount;
       if (!investmentAmount) {
-        // Back-calculate from shares: shares * (cap / total shares)
-        const impliedPricePerShare = round.valuationCap / capTable.authorizedShares;
-        investmentAmount = alloc.shares * impliedPricePerShare;
+        // Back-calculate from pre-priced as-if shares formula using the same capitalization base
+        investmentAmount = alloc.shares * (round.valuationCap / preMoneyCapShares);
       }
 
       const convertedShares = Math.round(investmentAmount / conversionPrice);
@@ -78,7 +85,7 @@ export function convertSAFEs(capTable, postMoneyValuation, pricePerShare) {
         convertedShares: convertedShares,
         investmentAmount: investmentAmount,
         conversionPrice: conversionPrice,
-        discount: (1 - conversionDiscount) * 100,
+        discount: conversionDiscount * 100,
         roundName: round.name
       });
 
