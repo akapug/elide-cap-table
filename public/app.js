@@ -490,8 +490,22 @@ function revertSAFEConversionsIfNoPricedRounds() {
     }
   });
   return changed;
+// Helper: robust date to timestamp (supports ISO and common locale formats)
+function toTime(d) {
+  if (!d) return NaN;
+  const t = new Date(d).getTime();
+  return isNaN(t) ? NaN : t;
 }
 
+}
+
+
+// Helper: robust date to timestamp (supports ISO and common locale formats)
+function toTime(d) {
+  if (!d) return NaN;
+  const t = new Date(d).getTime();
+  return isNaN(t) ? NaN : t;
+}
 
 // Chronology warnings helpers (non-blocking)
 function gatherChronologyWarnings(cap) {
@@ -514,25 +528,25 @@ function gatherChronologyWarnings(cap) {
   const nonPoolNonSafe = rounds.filter(r => r.type !== 'equity-pool' && r.type !== 'safe' && r.type !== 'priced');
 
   priced.forEach(p => {
-    const pd = (p && p.date) || '';
+    const pt = toTime(p && p.date);
     // SAFEs dated after the priced round
     safes.forEach(s => {
-      const sd = (s && s.date) || '';
-      if (sd && pd && sd > pd) {
+      const st = toTime(s && s.date);
+      if (!isNaN(st) && !isNaN(pt) && st > pt) {
         warnings.push(`SAFE "${s.name}" (${sd}) occurs after priced "${p.name}" (${pd}) but will still convert.`);
       }
     });
     // Pools authorized after the priced round (still included in our pre-money base)
     pools.forEach(pool => {
-      const qd = (pool && pool.date) || '';
-      if (qd && pd && qd > pd && (pool.authorizedShares || 0) > 0) {
+      const qt = toTime(pool && pool.date);
+      if (!isNaN(qt) && !isNaN(pt) && qt > pt && (pool.authorizedShares || 0) > 0) {
         warnings.push(`Equity pool "${pool.name}" (${qd}) is dated after "${p.name}" (${pd}) but is included in pre-money base.`);
       }
     });
     // Other issued rounds after the priced round
     nonPoolNonSafe.forEach(r => {
-      const rd = (r && r.date) || '';
-      if (rd && pd && rd > pd) {
+      const rt = toTime(r && r.date);
+      if (!isNaN(rt) && !isNaN(pt) && rt > pt) {
         warnings.push(`Issued round "${r.name}" (${rd}) occurs after priced "${p.name}" (${pd}) but is counted in pre-money base.`);
       }
     });
