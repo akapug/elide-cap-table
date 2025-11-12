@@ -460,6 +460,26 @@ export function renderTreemap(capTable, viewMode, zoomNode, onNodeClick, unalloc
   container.appendChild(svg.node());
 }
 
+// Helper: robust date to timestamp (supports ISO and common locale formats)
+function toTime(d) {
+  if (!d) return NaN;
+  const t = new Date(d).getTime();
+  return isNaN(t) ? NaN : t;
+}
+
+// Helper: stable sort rounds by date (missing dates last); tie-break by name
+function getRoundsSortedByDate(rounds) {
+  return [...(rounds || [])].sort((a, b) => {
+    const at = toTime(a && a.date);
+    const bt = toTime(b && b.date);
+    if (isNaN(at) && isNaN(bt)) return (a?.name || '').localeCompare(b?.name || '');
+    if (isNaN(at)) return 1;
+    if (isNaN(bt)) return -1;
+    if (at !== bt) return at - bt;
+    return (a?.name || '').localeCompare(b?.name || '');
+  });
+}
+
 function capTableToTree(capTable, mode) {
   // Helper to get value based on mode
   const getValue = (shares, round) => {
@@ -481,7 +501,8 @@ function capTableToTree(capTable, mode) {
     return 0;
   };
 
-  const children = capTable.rounds.map((round) => {
+  const sortedRounds = getRoundsSortedByDate(capTable.rounds);
+  const children = sortedRounds.map((round) => {
     const roundChildren = round.allocations.map((allocation) => ({
       name: allocation.holderName,
       value: getValue(allocation.shares, round),

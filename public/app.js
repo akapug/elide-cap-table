@@ -653,12 +653,25 @@ function closeLegalDisclaimerModal() {
   document.getElementById("legal-disclaimer-modal").classList.remove("visible");
 }
 
+// Helper: stable sort rounds by date (missing dates last); tie-break by name
+function getRoundsSortedByDate(rounds) {
+  return [...(rounds || [])].sort((a, b) => {
+    const at = toTime(a && a.date);
+    const bt = toTime(b && b.date);
+    if (isNaN(at) && isNaN(bt)) return (a?.name || '').localeCompare(b?.name || '');
+    if (isNaN(at)) return 1;
+    if (isNaN(bt)) return -1;
+    if (at !== bt) return at - bt; // chronological ascending
+    return (a?.name || '').localeCompare(b?.name || '');
+  });
+}
+
 // Update legend
 function updateLegend() {
   const legendItems = document.getElementById("legend-items");
   legendItems.innerHTML = "";
 
-  capTable.rounds.forEach((round) => {
+  getRoundsSortedByDate(capTable.rounds).forEach((round) => {
     const item = document.createElement("div");
     item.className = "legend-item";
     item.innerHTML = `
@@ -968,7 +981,7 @@ function renderRoundsList() {
   const container = document.getElementById("rounds-list");
   container.innerHTML = "";
 
-  capTable.rounds.forEach((round) => {
+  getRoundsSortedByDate(capTable.rounds).forEach((round) => {
     const totalShares = round.allocations.reduce((sum, a) => sum + a.shares, 0);
     const item = document.createElement("div");
     item.className = "list-item";
