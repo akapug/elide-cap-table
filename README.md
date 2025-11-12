@@ -46,28 +46,36 @@ An interactive cap table visualization tool using the **filesystem/treemap analo
 
 ## 🚀 Running the App
 
-### Development (Node.js - Recommended for beta10)
+### Development (Elide; static site with localStorage)
 ```bash
 cd elide-cap-table
-npm install
-npm run dev
+elide help
+elide serve server.ts
 ```
 
-Open http://localhost:8080
+Open the printed local URL (Elide will display it in the console).
 
-### Production (Elide - when beta11+ fixes HTTP serving)
+### Development (Elide + SQLite persistence)
 ```bash
 cd elide-cap-table
-elide install
-elide dev
+elide serve server-sqlite.ts
+```
+
+This mode enables the REST API at /api/captable and persists data to captable.db via jsr:@db/sqlite.
+
+### Optional legacy (Node.js fallback)
+```bash
+cd elide-cap-table
+npm ci
+npm run dev
 ```
 
 ## 🏗️ Architecture
 
 ### Tech Stack
-- **Runtime**: Elide v1.0.0-beta10 (with Node.js fallback)
+- **Runtime**: Elide v1.0.0-beta11+ (Node.js fallback optional)
 - **Visualization**: D3.js v7 (treemap layout)
-- **Storage**: localStorage (browser-based)
+- **Storage**: Browser localStorage by default; optional SQLite via Elide server (see db.ts)
 - **Styling**: Custom CSS with dark theme
 
 ### File Structure
@@ -217,11 +225,10 @@ See `docs/carta-integration.md` (to be created) for detailed implementation guid
 - [ ] Time-series view (cap table evolution)
 - [ ] Multi-company support
 
-## 🐛 Known Issues (beta10)
+## 🐛 Known Issues
 
-- **Elide HTTP serving broken** - using Node.js fallback
-- **No backend persistence** - localStorage only (browser-based)
 - **No authentication** - single-user, local-only
+- **Persistence defaults to localStorage** - enable SQLite mode locally via `elide serve server-sqlite.ts` to persist to `captable.db`
 
 ## 📝 License
 
